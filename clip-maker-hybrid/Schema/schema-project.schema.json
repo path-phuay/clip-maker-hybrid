@@ -1,0 +1,466 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clip-maker.dev/schema/project.schema.json",
+  "title": "ClipProject v2",
+  "description": "Canonical project format for Clip Maker Hybrid AI SVG Animation Generator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "assets", "scenes", "shots", "timeline"],
+  "properties": {
+    "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
+    "project":       { "$ref": "#/$defs/project" },
+    "assets":        { "$ref": "#/$defs/assets" },
+    "scenes":        { "$ref": "#/$defs/scenes" },
+    "shots":         { "$ref": "#/$defs/shots" },
+    "timeline":      { "$ref": "#/$defs/timeline" },
+    "legacyData": {
+      "type": "object",
+      "description": "Original v1 data preserved verbatim during migration. Never used for rendering.",
+      "additionalProperties": true
+    }
+  },
+
+  "$defs": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^2\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of ClipProject schema. Major must be 2."
+    },
+
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_\\-]{0,127}$",
+      "description": "Stable identifier. Must start with a letter; only alnum, underscore, hyphen."
+    },
+
+    "seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Duration or timestamp in seconds (finite, non-negative)."
+    },
+
+    "normalized": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Normalized coordinate value in [0, 1]."
+    },
+
+    "color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+      "description": "Hex color, e.g. #FFFFFF or #FFFFFFAA."
+    },
+
+    "easing": {
+      "type": "string",
+      "enum": ["linear", "ease_in", "ease_out", "ease_in_out", "ease_in_out_cubic"]
+    },
+
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width":  { "type": "integer", "minimum": 1, "maximum": 16384 },
+        "height": { "type": "integer", "minimum": 1, "maximum": 16384 }
+      }
+    },
+
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preset"],
+      "properties": {
+        "preset":            { "type": "string", "minLength": 1 },
+        "characterStyle":    { "type": "string" },
+        "environmentStyle":  { "type": "string" },
+        "palette": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/color" },
+          "maxItems": 32
+        },
+        "lighting":          { "type": "string" },
+        "consistency":       { "type": "string", "enum": ["low", "medium", "high"] }
+      }
+    },
+
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "fps", "resolution", "aspectRatio", "duration", "style"],
+      "properties": {
+        "id":          { "$ref": "#/$defs/id" },
+        "title":       { "type": "string", "minLength": 1, "maxLength": 200 },
+        "fps":         { "type": "integer", "minimum": 1, "maximum": 120 },
+        "resolution":  { "$ref": "#/$defs/resolution" },
+        "aspectRatio": { "type": "string", "pattern": "^[1-9][0-9]*:[1-9][0-9]*$" },
+        "duration":    { "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
+        "style":       { "$ref": "#/$defs/style" }
+      }
+    },
+
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["characters", "vector"],
+      "properties": {
+        "characters": {
+          "type": "object",
+          "description": "Map of characterId -> Character definition.",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "$ref": "#/$defs/character" }
+        },
+        "vector": {
+          "type": "object",
+          "description": "Map of assetId -> vector asset (SVG, image, etc).",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "$ref": "#/$defs/vectorAsset" }
+        },
+        "props": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "$ref": "#/$defs/vectorAsset" }
+        },
+        "graphics": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "$ref": "#/$defs/vectorAsset" }
+        }
+      }
+    },
+
+    "character": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type", "views"],
+      "properties": {
+        "id":   { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "type": {
+          "type": "string",
+          "enum": ["humanoid", "quadruped", "static_svg", "emoji_fallback"]
+        },
+        "design": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "description": { "type": "string" },
+            "seed":        { "type": "integer" },
+            "colors": {
+              "type": "object",
+              "additionalProperties": { "$ref": "#/$defs/color" }
+            }
+          }
+        },
+        "views": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["front"],
+          "properties": {
+            "front":         { "$ref": "#/$defs/id" },
+            "threeQuarter":  { "$ref": "#/$defs/id" },
+            "side":          { "$ref": "#/$defs/id" },
+            "back":          { "$ref": "#/$defs/id" }
+          }
+        },
+        "rig": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "assetId"],
+          "properties": {
+            "type":    { "type": "string", "enum": ["humanoid", "quadruped_simplified", "none"] },
+            "assetId": { "$ref": "#/$defs/id" }
+          }
+        },
+        "supportedActions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["idle", "walk", "run", "jump", "wave", "punch", "float", "fly"]
+          }
+        }
+      }
+    },
+
+    "vectorAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "uri"],
+      "properties": {
+        "id":     { "$ref": "#/$defs/id" },
+        "kind":   { "type": "string", "enum": ["svg", "png", "jpg", "webp"] },
+        "uri":    { "type": "string", "minLength": 1 },
+        "width":  { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "scenes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/scene" }
+    },
+
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "layers"],
+      "properties": {
+        "id":          { "$ref": "#/$defs/id" },
+        "title":       { "type": "string", "minLength": 1, "maxLength": 200 },
+        "location":    { "type": "string" },
+        "environment": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "timeOfDay": { "type": "string", "enum": ["dawn", "morning", "day", "noon", "dusk", "evening", "night"] },
+            "weather":   { "type": "string", "enum": ["clear", "cloudy", "rain", "snow", "storm", "fog"] }
+          }
+        },
+        "layers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/layer" }
+        },
+        "lighting": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "preset":  { "type": "string" },
+            "ambient": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "depth", "assetIds"],
+      "properties": {
+        "id":   { "$ref": "#/$defs/id" },
+        "type": {
+          "type": "string",
+          "enum": ["background", "environment", "ground", "character", "foreground", "atmosphere", "graphics", "subtitles"]
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Render order; lower renders earlier (further back)."
+        },
+        "assetIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/shot" }
+    },
+
+    "shot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sceneId", "start", "duration", "camera"],
+      "properties": {
+        "id":       { "$ref": "#/$defs/id" },
+        "sceneId":  { "$ref": "#/$defs/id" },
+        "start":    { "$ref": "#/$defs/seconds" },
+        "duration": { "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
+        "camera":   { "$ref": "#/$defs/camera" },
+        "actors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actorInstance" }
+        },
+        "graphics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/graphic" }
+        },
+        "effects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/effect" }
+        },
+        "transitionOut": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "duration"],
+          "properties": {
+            "type":     { "type": "string", "enum": ["cut", "fade", "wipe", "slide"] },
+            "duration": { "$ref": "#/$defs/seconds" }
+          },
+          "allOf": [
+            {
+              "if":   { "properties": { "type": { "const": "cut" } }, "required": ["type"] },
+              "then": { "properties": { "duration": { "const": 0 } } }
+            }
+          ]
+        }
+      }
+    },
+
+    "camera": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shotType", "angle"],
+      "properties": {
+        "shotType": {
+          "type": "string",
+          "enum": ["extreme_wide", "wide", "full", "medium", "close_up", "extreme_close_up", "over_shoulder", "low_angle", "high_angle", "top_down"]
+        },
+        "angle": {
+          "type": "string",
+          "enum": ["eye_level", "low", "high", "top_down", "over_shoulder"]
+        },
+        "targetId": { "$ref": "#/$defs/id" },
+        "movement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "from", "to", "easing"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["static", "pan", "tilt", "dolly_in", "dolly_out", "truck", "zoom", "follow", "orbit", "shake"]
+            },
+            "from":   { "$ref": "#/$defs/cameraTransform" },
+            "to":     { "$ref": "#/$defs/cameraTransform" },
+            "easing": { "$ref": "#/$defs/easing" }
+          }
+        },
+        "focus": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "targetId": { "$ref": "#/$defs/id" },
+            "dofBlur":  { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+
+    "cameraTransform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "zoom"],
+      "properties": {
+        "x":    { "$ref": "#/$defs/normalized" },
+        "y":    { "$ref": "#/$defs/normalized" },
+        "zoom": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "roll": { "type": "number" }
+      }
+    },
+
+    "actorInstance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["characterId", "view", "position", "facing", "action"],
+      "properties": {
+        "characterId": { "$ref": "#/$defs/id" },
+        "view": {
+          "type": "string",
+          "enum": ["front", "threeQuarter", "side", "back"]
+        },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "$ref": "#/$defs/normalized" },
+            "y": { "$ref": "#/$defs/normalized" },
+            "z": { "$ref": "#/$defs/normalized" }
+          }
+        },
+        "facing":     { "type": "string", "enum": ["left", "right", "front", "back"] },
+        "action": {
+          "type": "string",
+          "enum": ["idle", "walk", "run", "jump", "wave", "punch", "float", "fly"]
+        },
+        "expression": { "type": "string" }
+      }
+    },
+
+    "graphic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "start", "duration"],
+      "properties": {
+        "id":          { "$ref": "#/$defs/id" },
+        "type":        { "type": "string", "enum": ["text", "shape", "icon", "lower_third", "title_card", "counter", "chart", "callout"] },
+        "text":        { "type": "string" },
+        "assetId":     { "$ref": "#/$defs/id" },
+        "start":       { "$ref": "#/$defs/seconds" },
+        "duration":    { "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
+        "animation":   { "type": "string" },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "$ref": "#/$defs/normalized" },
+            "y": { "$ref": "#/$defs/normalized" }
+          }
+        }
+      }
+    },
+
+    "effect": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "type"],
+      "properties": {
+        "id":   { "$ref": "#/$defs/id" },
+        "type": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "timeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["audioTracks", "subtitleTracks", "musicTracks"],
+      "properties": {
+        "audioTracks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/audioTrack" }
+        },
+        "subtitleTracks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/subtitleTrack" }
+        },
+        "musicTracks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/audioTrack" }
+        }
+      }
+    },
+
+    "audioTrack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "assetId", "start"],
+      "properties": {
+        "id":       { "$ref": "#/$defs/id" },
+        "assetId":  { "$ref": "#/$defs/id" },
+        "start":    { "$ref": "#/$defs/seconds" },
+        "duration": { "$ref": "#/$defs/seconds" },
+        "volume":   { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+
+    "subtitleTrack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "start", "duration"],
+      "properties": {
+        "id":       { "$ref": "#/$defs/id" },
+        "text":     { "type": "string", "minLength": 1 },
+        "start":    { "$ref": "#/$defs/seconds" },
+        "duration": { "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
+        "language": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+10. Dependencies & Commands (สรุป)
+รายการ	ค่า
+Node.js	>= 20
+ajv	^8.17.1
+ajv-formats	^3.0.1
+ติดตั้ง	npm install
+รันทดสอบ	npm test
+11. Assumptions & Limitations (สรุป)
+Assumptions:
+
+assets.characters และ assets.vector เป็น map keyed by ID (ตรงตามตัวอย่างใน §5.2)
+
+Asset uri เป็น relative หรือ absolute ก็ได้ — AssetLoader (DS-04) เป็นผู้ resolve
+
+effect objects เปิด additionalProperties: true เพราะ Architecture §6.6 ยังไม่ enumerate effect kinds
+
+Root ปฏิเสธ unknown fields (additionalProperties: false) เพื่อกัน silent drift
+
+Limitations (โดยตั้งใจ):
+
+JSON Schema ไม่สามารถตรวจ referential integrity → ส่งต่อ DS-02
+
+JSON Schema ไม่สามารถตรวจ uniqueness ข้าม array → ส่งต่อ DS-02
+
+JSON Schema ไม่สามารถตรวจ temporal overlap / sum tolerance → ส่งต่อ DS-02
+
+JSON Schema ไม่สามารถตรวจ composition (subject in frame) → ส่งต่อ DS-02
+
+assets.characters.<key>.id ≠ key — schema จับได้แค่บางกรณี (fixture duplicate-character-id.json ผ่านการจับเพราะ object id เอง valid แต่ key mismatch เป็นเรื่อง DS-02)
+
+12. Points Requiring Architecture Owner Decision
+ก่อนอนุมัติไป DS-02 ผมขอให้ ChatGPT / Architecture Owner ตัดสินประเด็นต่อไปนี้ (เพราะมันจะกระทบ contract ของ DS-02 / DS-03):
+
+#	คำถาม	ทางเลือก	ผลกระทบ
+Q1	Root ควร additionalProperties: false (เข้ม) หรือ true (forward-compat)?	เข้ม = ปลอดภัยจาก drift; ผ่อน = รองรับ project ใหม่จาก client อื่นได้	ถ้าเลือก "ผ่อน" ต้องแก้ root และอาจต้องเพิ่ม field _meta
+Q2	assets.characters ควรเป็น map หรือ array?	map = ตรงกับ §5.2; array = ใช้ uniqueItems ของ JSON Schema ได้ตรงๆ	เปลี่ยน array = ต้องแก้ DS-02 reference validator และ DS-03 converter
+Q3	views.front required สำหรับ emoji_fallback ด้วยหรือไม่?	ปัจจุบัน required ทุก type	ถ้า exempt emoji ต้องเพิ่ม if/then
+Q4	timeline.*Tracks ต้องการ duration required หรือ optional?	ปัจจุบัน optional	ถ้า required ต้องแก้ audioTrack
+Q5	ต้องการ shot.transitionOut default = {type:"cut",duration:0} หรือไม่?	ปัจจุบัน optional	ไม่กระทบ schema แต่กระทบ runtime default
+ผมยังไม่เริ่ม DS-02 จนกว่าจะได้รับอนุมัติและคำตอบ Q1–Q5 (หรือคำสั่งให้ proceed ด้วย default ที่ผมเลือก)
+
+13. สรุปสิ่งที่ส่งมอบ
+✅ 13 ไฟล์ ครบตาม Task DS-01:
+
+schema/project.schema.json (1)
+
+fixtures/valid/*.json (4)
+
+fixtures/invalid/*.json (12)
+
+tests/schema.test.mjs (1)
+
+package.json (1)
+
+README.md (1)
+
+✅ Ambiguities 12 ข้อ รายงานพร้อมทางเลือกและเหตุผล (§2)
+✅ Decision points 5 ข้อ รอ Architecture Owner อนุมัติ (§12)
+✅ ไม่แตะ clip-maker.html ต้นฉบับ
+✅ ไม่เริ่ม DS-02 หรือ Task อื่น
+
+พร้อมรับ feedback / revision ครับ 🙏

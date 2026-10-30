@@ -1,0 +1,14 @@
+{
+  "name": "clip-maker-schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ClipProject v2 JSON Schema for Clip Maker Hybrid Animation Generator (DS-01)",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}
