@@ -30,8 +30,7 @@ test("schema file is valid Draft 2020-12", () => {
 
 test("all valid fixtures pass schema validation", () => {
   const ajv = buildAjv();
-  const schema = loadJson(SCHEMA_PATH);
-  const validate = ajv.compile(schema);
+  const validate = ajv.compile(loadJson(SCHEMA_PATH));
 
   const files = readdirSync(VALID_DIR).filter(f => f.endsWith(".json"));
   assert.ok(files.length >= 3, "expected at least 3 valid fixtures");
@@ -40,7 +39,9 @@ test("all valid fixtures pass schema validation", () => {
     const data = loadJson(join(VALID_DIR, file));
     const ok = validate(data);
     if (!ok) {
-      assert.fail(`Fixture ${file} should be VALID but got errors: ${JSON.stringify(validate.errors, null, 2)}`);
+      assert.fail(
+        `Fixture ${file} should be VALID but got errors: ${JSON.stringify(validate.errors, null, 2)}`
+      );
     }
     assert.ok(ok, `${file} should pass`);
   }
@@ -48,8 +49,7 @@ test("all valid fixtures pass schema validation", () => {
 
 test("all invalid fixtures fail schema validation", () => {
   const ajv = buildAjv();
-  const schema = loadJson(SCHEMA_PATH);
-  const validate = ajv.compile(schema);
+  const validate = ajv.compile(loadJson(SCHEMA_PATH));
 
   const files = readdirSync(INVALID_DIR).filter(f => f.endsWith(".json"));
   assert.ok(files.length >= 3, "expected at least 3 invalid fixtures");
@@ -67,7 +67,6 @@ test("all invalid fixtures fail schema validation", () => {
 test("cut transition must have duration === 0 (if/then rule)", () => {
   const ajv = buildAjv();
   const validate = ajv.compile(loadJson(SCHEMA_PATH));
-
   const base = loadJson(join(VALID_DIR, "minimal-project.json"));
 
   const cutOk = structuredClone(base);
