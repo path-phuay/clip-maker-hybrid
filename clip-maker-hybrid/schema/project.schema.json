@@ -95,7 +95,7 @@
         "fps":         { "type": "integer", "minimum": 1, "maximum": 120 },
         "resolution":  { "$ref": "#/$defs/resolution" },
         "aspectRatio": { "type": "string", "pattern": "^[1-9][0-9]*:[1-9][0-9]*$" },
-        "duration":    { "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
+        "duration":    { "type": "number", "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
         "style":       { "$ref": "#/$defs/style" }
       }
     },
@@ -272,7 +272,7 @@
         "id":       { "$ref": "#/$defs/id" },
         "sceneId":  { "$ref": "#/$defs/id" },
         "start":    { "$ref": "#/$defs/seconds" },
-        "duration": { "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
+        "duration": { "type": "number", "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
         "camera":   { "$ref": "#/$defs/camera" },
         "actors": {
           "type": "array",
@@ -394,7 +394,7 @@
         "text":        { "type": "string" },
         "assetId":     { "$ref": "#/$defs/id" },
         "start":       { "$ref": "#/$defs/seconds" },
-        "duration":    { "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
+        "duration":    { "type": "number", "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
         "animation":   { "type": "string" },
         "position": {
           "type": "object",
@@ -458,7 +458,7 @@
         "id":       { "$ref": "#/$defs/id" },
         "text":     { "type": "string", "minLength": 1 },
         "start":    { "$ref": "#/$defs/seconds" },
-        "duration": { "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
+        "duration": { "type": "number", "$ref": "#/$defs/seconds", "exclusiveMinimum": 0 },
         "language": { "type": "string" }
       }
     }
