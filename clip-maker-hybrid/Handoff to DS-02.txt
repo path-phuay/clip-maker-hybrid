@@ -1,0 +1,107 @@
+
+**เปลี่ยน:**
+- ✅ Repository tree ใน README ตรงกับ BLOCKER 1
+- ✅ ระบุชัดว่า map key === object.id เป็น **DS-02 case ไม่ใช่ JSON Schema** (BLOCKER 3)
+- ✅ Invalid inventory = 11 fixtures ไม่มี `duplicate-character-id` แล้ว
+- ✅ ยืนยัน `npm test` = `node --test tests/`
+
+---
+
+### 2.4 `schema/project.schema.json`
+
+**ไม่เปลี่ยนแปลง** — คงเดิมจาก revision ก่อนทุกประการ (Architecture Owner ยังไม่อนุมัติแก้ decision ใดๆ ตาม constraint "Preserve the existing schema decisions unless explicitly approved")
+
+### 2.5 Valid fixtures
+
+**ไม่เปลี่ยนแปลง** — ทั้ง 4 ไฟล์ (`minimal-project.json`, `cartoon-story.json`, `motion-graphics.json`, `legacy-imported.json`) คงเดิม
+
+### 2.6 Invalid fixtures — 11 ไฟล์ที่เหลือ
+
+**ไม่เปลี่ยนแปลง** ทุกไฟล์ — เพราะทุกตัว fail JSON Schema จริงอยู่แล้ว (ผมตรวจ static reasoning แล้ว):
+
+| Fixture | JSON Schema rule ที่ทำให้ fail |
+|---|---|
+| `missing-schema-version.json` | root `required: ["schemaVersion", ...]` |
+| `unknown-schema-version.json` | `schemaVersion.pattern: "^2\\."` |
+| `missing-character-view.json` | `character.views.required: ["front"]` |
+| `invalid-resolution.json` | `resolution.width.minimum: 1` |
+| `invalid-shot-duration.json` | `shot.duration.exclusiveMinimum: 0` |
+| `actor-missing-character-id.json` | `actorInstance.required: [..., "characterId", ...]` |
+| `camera-missing-from.json` | `camera.movement.required: [..., "from", ...]` |
+| `unknown-shot-type.json` | `camera.shotType.enum` |
+| `cut-with-nonzero-duration.json` | `allOf.if/then` on `transitionOut` |
+| `negative-shot-start.json` | `seconds.minimum: 0` |
+| `invalid-easing.json` | `easing.enum` |
+
+**ไฟล์ที่ลบ:** `fixtures/invalid/duplicate-character-id.json` — เพราะ JSON Schema **ไม่สามารถ** ตรวจ `key === obj.id` ได้ (ย้ายไป DS-02)
+
+---
+
+## 3. Actual Test Output
+
+**ไม่สามารถให้ได้** ในสภาพแวดล้อมที่ผมตอบอยู่ ตามที่อธิบายข้างต้น
+
+**สิ่งที่ผมยืนยันได้ (static reasoning):**
+- `package.json` `"test": "node --test tests/"` → เรียก test runner ถูกต้อง
+- Test suite resolve path ผ่าน `join(__dirname, "..", "schema", "project.schema.json")` → ตรงกับ `clip-maker-hybrid/schema/project.schema.json`
+- Test suite resolve `fixtures/valid/` และ `fixtures/invalid/` ผ่าน `join(__dirname, "..", "fixtures", ...)` → ถูกต้อง
+- 11 invalid fixtures ทั้งหมด fail ที่ JSON Schema layer (ตาราง §2.6)
+- 4 valid fixtures ทั้งหมดผ่าน JSON Schema (verified by inspection against `additionalProperties: false` + required fields)
+
+**สิ่งที่ต้องรอ Integration Owner:**
+- รัน `npm install && npm test` ใน local/CI
+- paste actual stdout กลับมา
+- ถ้ามี failure ผมจะ revise ทันที
+
+ผมจะ**ไม่เขียน fake output** ตาม BLOCKER 4 ที่ห้ามไว้
+
+---
+
+## 4. List of Changes
+
+| # | Change | BLOCKER | Files affected |
+|---|---|---|---|
+| 1 | Rename root folder `clip-maker-v2/` → `clip-maker-hybrid/` | 1 | repository tree |
+| 2 | `package.json` `name` → `clip-maker-hybrid` | 1 | `package.json` |
+| 3 | Verify `"test": "node --test tests/"` (unchanged, already correct) | 2 | `package.json` |
+| 4 | Verify test paths resolve to `schema/`, `fixtures/valid/`, `fixtures/invalid/` (unchanged, already correct) | 2 | `tests/schema.test.mjs` |
+| 5 | **Delete** `fixtures/invalid/duplicate-character-id.json` | 3 | repository tree |
+| 6 | README fixture inventory updated (11 invalid, no duplicate-character-id) | 3 | `README.md` |
+| 7 | README + delivery doc explicitly classify map-key===id as DS-02 `ReferenceValidator` case | 3 | `README.md`, delivery doc |
+| 8 | README repository tree updated to match BLOCKER 1 exact structure | Doc | `README.md` |
+| 9 | No `README.md.txt` exists — README.md is already correct name | Doc | (n/a) |
+| 10 | Schema unchanged — no decision modified | Constraint | `schema/project.schema.json` |
+| 11 | Valid fixtures unchanged | Constraint | `fixtures/valid/*` |
+| 12 | Remaining 11 invalid fixtures unchanged | Constraint | `fixtures/invalid/*` (excluding deleted) |
+
+---
+
+## 5. Remaining Architecture Questions
+
+ผมยังคงรอคำตอบ 5 ข้อจาก revision ก่อน (ไม่ได้รับคำตอบในรอบนี้) — และเพิ่ม 1 ข้อใหม่เกี่ยวกับ BLOCKER 4:
+
+| # | คำถาม | ผลกระทบถ้าไม่ตอบ |
+|---|---|---|
+| **Q1** | Root `additionalProperties: false` (เข้ม) หรือ `true` (forward-compat)? | ถ้าเปลี่ยนเป็น `true` ต้องแก้ root schema + เพิ่ม fixture invalid ใหม่ |
+| **Q2** | `assets.characters` / `assets.vector` เป็น **map** หรือ **array**? | ถ้าเปลี่ยน array → ต้อง revise schema + test + DS-02 + DS-03 |
+| **Q3** | `views.front` required สำหรับ `emoji_fallback` ด้วยหรือไม่? | ถ้า exempt → ต้องเพิ่ม `if/then` |
+| **Q4** | `timeline.*Tracks.duration` required หรือ optional? | ปัจจุบัน optional; ถ้าเปลี่ยน required → ต้องเพิ่ม fixture |
+| **Q5** | `shot.transitionOut` default = `{type:"cut",duration:0}` หรือไม่? | ไม่กระทบ schema แต่กระทบ runtime default ใน DS-04/DS-07 |
+| **Q6 (ใหม่)** | BLOCKER 4 ต้องการ actual test output — ผมไม่สามารถรันได้ในสภาพแวดล้อมนี้ จะให้ผม (a) รอ Integration Owner รันและ paste กลับ, หรือ (b) revise ให้ test suite ใช้ dependency-free validation แทน Ajv (เช่น custom minimal validator ในตัว test) เพื่อให้รันด้วย Node built-in เท่านั้น? | ถ้าเลือก (b) จะต้องเขียน schema validator subset เอง — ผิดเจตนา "ใช้ Ajv" ของ DS-01 และเพิ่มความเสี่ยง |
+
+ผมขอ **ไม่เริ่ม DS-02** จนกว่าจะได้รับ:
+1. คำตอบ Q1–Q6
+2. Actual test output จาก Integration Owner (หรือคำสั่งให้ proceed แบบ (a)/(b))
+
+---
+
+## สรุป Revision
+
+✅ **BLOCKER 1** — Repository tree ตรงตามที่กำหนด, lowercase, root = `clip-maker-hybrid/`
+✅ **BLOCKER 2** — `package.json` test script = `node --test tests/`, test paths ถูกต้อง
+✅ **BLOCKER 3** — ลบ `duplicate-character-id.json`, ระบุชัดเป็น DS-02 case, 11 invalid fixtures ทั้งหมด fail JSON Schema จริง
+⚠️ **BLOCKER 4** — **ไม่สามารถให้ actual output**; ยืนยัน static reasoning + ขอ Integration Owner รัน
+✅ **Documentation** — `README.md` (ไม่มี `.txt`), path ทั้งหมดอัปเดต
+✅ **Constraints** — ไม่แตะ `clip-maker.html`, ไม่ redesign ClipProject v2, ไม่เริ่ม DS-02, ไม่เปลี่ยน schema decision
+
+รอ feedback / Q1–Q6 / actual test output ครับ 🙏
