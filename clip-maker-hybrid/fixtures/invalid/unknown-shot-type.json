@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "2.0.0",
+  "project": { "id": "p", "title": "t", "fps": 30, "resolution": { "width": 720, "height": 1280 }, "aspectRatio": "9:16", "duration": 1, "style": { "preset": "x" } },
+  "assets": { "characters": {}, "vector": {} },
+  "scenes": [ { "id": "s1", "title": "S", "layers": [ { "id": "l1", "type": "background", "depth": 0, "assetIds": [] } ] } ],
+  "shots": [ { "id": "sh1", "sceneId": "s1", "start": 0, "duration": 1, "camera": { "shotType": "super_mega_wide", "angle": "eye_level" } } ],
+  "timeline": { "audioTracks": [], "subtitleTracks": [], "musicTracks": [] }
+}

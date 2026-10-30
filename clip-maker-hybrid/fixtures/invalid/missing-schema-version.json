@@ -1,0 +1,7 @@
+{
+  "project": { "id": "p", "title": "t", "fps": 30, "resolution": { "width": 1, "height": 1 }, "aspectRatio": "1:1", "duration": 1, "style": { "preset": "x" } },
+  "assets": { "characters": {}, "vector": {} },
+  "scenes": [],
+  "shots": [],
+  "timeline": { "audioTracks": [], "subtitleTracks": [], "musicTracks": [] }
+}
