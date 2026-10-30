@@ -1,8 +1,0 @@
-{
-  "schemaVersion": "2.0.0",
-  "project": { "id": "p", "title": "t", "fps": 30, "resolution": { "width": 0, "height": 1280 }, "aspectRatio": "9:16", "duration": 1, "style": { "preset": "x" } },
-  "assets": { "characters": {}, "vector": {} },
-  "scenes": [],
-  "shots": [],
-  "timeline": { "audioTracks": [], "subtitleTracks": [], "musicTracks": [] }
-}
