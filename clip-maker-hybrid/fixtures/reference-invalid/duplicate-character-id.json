@@ -1,13 +1,57 @@
 {
   "schemaVersion": "2.0.0",
-  "project": { "id": "p", "title": "t", "fps": 30, "resolution": { "width": 1, "height": 1 }, "aspectRatio": "1:1", "duration": 1, "style": { "preset": "x" } },
+  "project": {
+    "id": "project_min",
+    "title": "Minimal",
+    "fps": 30,
+    "resolution": { "width": 720, "height": 1280 },
+    "aspectRatio": "9:16",
+    "duration": 3,
+    "style": { "preset": "cinematic_cartoon" }
+  },
   "assets": {
     "characters": {
-      "char_hero": { "id": "char_other", "name": "Hero", "type": "static_svg", "views": { "front": "a1" } }
+      "char_hero": {
+        "id": "char_other",
+        "name": "Hero",
+        "type": "static_svg",
+        "views": { "front": "asset_hero_front" }
+      }
     },
-    "vector": { "a1": { "id": "a1", "kind": "svg", "uri": "x.svg" } }
+    "vector": {
+      "asset_hero_front": {
+        "id": "asset_hero_front",
+        "kind": "svg",
+        "uri": "assets/characters/hero/front.svg",
+        "width": 512,
+        "height": 512
+      }
+    }
   },
-  "scenes": [ { "id": "s1", "title": "S", "layers": [ { "id": "l1", "type": "background", "depth": 0, "assetIds": ["a1"] } ] } ],
-  "shots": [ { "id": "sh1", "sceneId": "s1", "start": 0, "duration": 1, "camera": { "shotType": "medium", "angle": "eye_level" } } ],
-  "timeline": { "audioTracks": [], "subtitleTracks": [], "musicTracks": [] }
+  "scenes": [
+    {
+      "id": "scene_001",
+      "title": "Night Street",
+      "layers": [
+        { "id": "sky", "type": "background", "depth": 0, "assetIds": ["asset_sky"] }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot_001",
+      "sceneId": "scene_001",
+      "start": 0,
+      "duration": 3,
+      "camera": {
+        "shotType": "medium",
+        "angle": "eye_level"
+      }
+    }
+  ],
+  "timeline": {
+    "audioTracks": [],
+    "subtitleTracks": [],
+    "musicTracks": []
+  }
 }
