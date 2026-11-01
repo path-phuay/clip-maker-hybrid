@@ -386,6 +386,12 @@ test("§J5 R11 accepts a camera without targetId", () => {
 test("§J6 R11 accepts one matching actor among multiple actors", () => {
   const project = loadJson(join(VALID_DIR, "minimal-project.json"));
   project.shots[0].camera.targetId = "char_hero";
+  // Keep both actor references valid under R9 while only one matches R11.
+  project.assets.characters.char_other = {
+    ...structuredClone(project.assets.characters.char_hero),
+    id: "char_other",
+    name: "Other",
+  };
   project.shots[0].actors = [makeActor("char_other"), makeActor("char_hero")];
 
   const result = validateProject(project);
