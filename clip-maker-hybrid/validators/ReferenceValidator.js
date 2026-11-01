@@ -1,8 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18,
-//   T1 (shot overlap), T2 (graphic bounds).
+//   R1, R5, R7-R20, T1-T7, and delegates C1 composition validation.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -188,8 +187,9 @@ function checkGraphicAssetReferences(project, out) {
 function checkEffectAssetReferences(project, out) {
   (project.shots ?? []).forEach((shot, shotIndex) => {
     (shot.effects ?? []).forEach((effect, effectIndex) => {
+      if (!Object.prototype.hasOwnProperty.call(EFFECT_ASSET_CONTRACT, effect.type)) return;
       const contract = EFFECT_ASSET_CONTRACT[effect.type];
-      if (!contract || contract.assetRequirement === "none") return;
+      if (contract.assetRequirement === "none") return;
 
       const basePath = ["shots", String(shotIndex), "effects", String(effectIndex)];
       if (typeof effect.assetId !== "string" || effect.assetId.length === 0) {
