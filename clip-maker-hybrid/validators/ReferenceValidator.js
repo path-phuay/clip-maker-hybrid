@@ -17,6 +17,7 @@ import {
   escapeJsonPointerToken,
 } from "./issues.js";
 import { validateComposition } from "./CompositionValidator.js";
+import { EFFECT_ASSET_CONTRACT } from "./effectAssetContract.js";
 
 /**
  * Build a JSON Pointer path for an Issue. Dynamic tokens are escaped.
@@ -170,6 +171,59 @@ function checkGraphicAssetReferences(project, out) {
           shotId: shot.id,
           graphicId: graphic.id,
           assetId: graphic.assetId
+        }
+      }));
+    });
+  });
+}
+
+
+/**
+ * R20 — Validate asset references for explicitly contracted Effect Types.
+ * Unknown Effect Types and Types with assetRequirement "none" are ignored.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkEffectAssetReferences(project, out) {
+  (project.shots ?? []).forEach((shot, shotIndex) => {
+    (shot.effects ?? []).forEach((effect, effectIndex) => {
+      const contract = EFFECT_ASSET_CONTRACT[effect.type];
+      if (!contract || contract.assetRequirement === "none") return;
+
+      const basePath = ["shots", String(shotIndex), "effects", String(effectIndex)];
+      if (typeof effect.assetId !== "string" || effect.assetId.length === 0) {
+        out.push(makeIssue({
+          severity: "error",
+          code: ISSUE_CODES.REF_EFFECT_ASSET_REQUIRED,
+          message: `Effect "${effect.id}" of type "${effect.type}" requires an assetId.`,
+          path: pointer([...basePath, "assetId"]),
+          entityId: effect.id,
+          context: {
+            shotId: shot.id,
+            effectId: effect.id,
+            effectType: effect.type,
+            registry: contract.registry
+          }
+        }));
+        return;
+      }
+
+      const registry = project.assets?.[contract.registry] ?? {};
+      if (Object.prototype.hasOwnProperty.call(registry, effect.assetId)) return;
+
+      out.push(makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.REF_EFFECT_ASSET_MISSING,
+        message: `Effect "${effect.id}" references assetId "${effect.assetId}" which does not exist in assets.${contract.registry}.`,
+        path: pointer([...basePath, "assetId"]),
+        entityId: effect.id,
+        context: {
+          shotId: shot.id,
+          effectId: effect.id,
+          effectType: effect.type,
+          assetId: effect.assetId,
+          registry: contract.registry
         }
       }));
     });
@@ -776,6 +830,7 @@ export function validateReferences(project) {
   checkCameraFocusTargetActorReferences(project, out); // R12
   checkTimelineAudioAssetReferences(project, out); // R15 + R16
   checkGraphicAssetReferences(project, out); // R19
+  checkEffectAssetReferences(project, out); // R20 DS-09E2
   checkDuplicateEntityIds(project, out); // R18
   checkShotOverlaps(project, out); // T1
   checkGraphicStartBounds(project, out); // T4
