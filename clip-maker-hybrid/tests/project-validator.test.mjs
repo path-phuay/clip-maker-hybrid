@@ -1,5 +1,5 @@
 // tests/project-validator.test.mjs
-// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 + DS-07 + DS-08 tests. Run via `node --test tests/`.
+// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 + DS-07 + DS-08 + DS-09A tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
 // Total: 91 tests
@@ -18,6 +18,9 @@
 //   §M  DS-06 R14 Asset Registry Map Key Integrity (10)
 //   §N  DS-07 R15/R16 Audio and Music Asset References (10)
 //   §O  DS-08 R17 Audio Asset Map Key Integrity (5)
+//   §P  DS-09A R18 Duplicate Scene/Shot IDs (5)
+//
+// Total: 96 tests
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -1169,3 +1172,78 @@ test("§O5 R17 schema-invalid projects skip reference validation and validation 
   assert.ok(codesOf(referenceResult).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
   assert.deepEqual(referenceInvalid, referenceSnapshot);
 });
+
+// =========================================================================
+// §P  DS-09A R18 Duplicate Scene and Shot IDs
+// =========================================================================
+
+test("§P1 R18 unique scene and shot IDs pass", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_DUPLICATE_ENTITY_ID));
+});
+
+test("§P2 R18 duplicate scene ID reports the later scene path", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.scenes.push({ ...structuredClone(project.scenes[0]) });
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 1);
+  assert.deepEqual(
+    { severity: errors[0].severity, path: errors[0].path, entityId: errors[0].entityId, context: errors[0].context },
+    {
+      severity: "error",
+      path: `/scenes/${project.scenes.length - 1}/id`,
+      entityId: project.scenes[0].id,
+      context: { collection: "scenes", id: project.scenes[0].id, firstIndex: 0, duplicateIndex: project.scenes.length - 1 }
+    }
+  );
+});
+
+test("§P3 R18 duplicate shot ID reports the later shot path", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.shots.push({ ...structuredClone(project.shots[0]) });
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, `/shots/${project.shots.length - 1}/id`);
+  assert.equal(errors[0].entityId, project.shots[0].id);
+  assert.deepEqual(errors[0].context, {
+    collection: "shots",
+    id: project.shots[0].id,
+    firstIndex: 0,
+    duplicateIndex: project.shots.length - 1
+  });
+});
+
+test("§P4 R18 reports every repeated occurrence within both collections", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const scene = structuredClone(project.scenes[0]);
+  const shot = structuredClone(project.shots[0]);
+  project.scenes.push(scene, structuredClone(scene));
+  project.shots.push(shot, structuredClone(shot));
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 4);
+  assert.deepEqual(errors.map(e => e.context.collection), ["scenes", "scenes", "shots", "shots"]);
+});
+
+test("§P5 R18 schema-invalid projects skip duplicate checks and validation does not mutate input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.scenes.push(structuredClone(invalid.scenes[0]));
+  const invalidSnapshot = structuredClone(invalid);
+  const invalidResult = validateProject(invalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!codesOf(invalidResult).includes(ISSUE_CODES.REF_DUPLICATE_ENTITY_ID));
+  assert.deepEqual(invalid, invalidSnapshot);
+
+  const duplicate = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  duplicate.scenes.push(structuredClone(duplicate.scenes[0]));
+  const duplicateSnapshot = structuredClone(duplicate);
+  const duplicateResult = validateProject(duplicate);
+  assert.ok(codesOf(duplicateResult).includes(ISSUE_CODES.REF_DUPLICATE_ENTITY_ID));
+  assert.deepEqual(duplicate, duplicateSnapshot);
+});
+
