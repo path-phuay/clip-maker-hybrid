@@ -113,3 +113,25 @@ test("schemaVersion pattern enforces major == 2", () => {
     assert.equal(validate(p), false, `version ${ver} should fail`);
   }
 });
+
+
+test("assets.rigs accepts the dedicated { id, uri } rig asset shape", () => {
+  const ajv = buildAjv();
+  const validate = ajv.compile(loadJson(SCHEMA_PATH));
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  assert.equal(validate(project), true, JSON.stringify(validate.errors, null, 2));
+});
+
+test("assets.rigs rejects missing uri and unexpected properties", () => {
+  const ajv = buildAjv();
+  const validate = ajv.compile(loadJson(SCHEMA_PATH));
+  const base = loadJson(join(VALID_DIR, "cartoon-story.json"));
+
+  const missingUri = structuredClone(base);
+  missingUri.assets.rigs.rig_humanoid_basic.uri = "";
+  assert.equal(validate(missingUri), false);
+
+  const extraProperty = structuredClone(base);
+  extraProperty.assets.rigs.rig_humanoid_basic.kind = "json";
+  assert.equal(validate(extraProperty), false);
+});
