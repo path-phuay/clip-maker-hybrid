@@ -2,7 +2,7 @@
 // DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 66 tests
+// Total: 76 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -15,6 +15,7 @@
 //   §J  DS-03B R11 Camera Target Actor References (10)
 //   §K  DS-04 R12 Camera Focus Target Actor References (11)
 //   §L  DS-05 R13 Character Rig Asset References (10)
+//   §M  DS-06 R14 Asset Registry Map Key Integrity (10)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
