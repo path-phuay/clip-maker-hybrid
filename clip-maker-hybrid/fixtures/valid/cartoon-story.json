@@ -98,6 +98,12 @@
         "kind": "svg",
         "uri": "assets/environment/rain-foreground.svg"
       }
+    },
+    "rigs": {
+      "rig_humanoid_basic": {
+        "id": "rig_humanoid_basic",
+        "uri": "assets/rigs/humanoid-basic.json"
+      }
     }
   },
   "scenes": [
