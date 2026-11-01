@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 + DS-03A + DS-03B tests. Run via `node --test tests/`.
+// DS-02 + DS-03A + DS-03B + DS-04 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 45 tests
+// Total: 56 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -13,6 +13,7 @@
 //   §H  Input guard robustness (Date/Map/class/Object.create(null)) (4)
 //   §I  DS-03A R7 Scene Layer Asset References (12)
 //   §J  DS-03B R11 Camera Target Actor References (10)
+//   §K  DS-04 R12 Camera Focus Target Actor References (11)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
