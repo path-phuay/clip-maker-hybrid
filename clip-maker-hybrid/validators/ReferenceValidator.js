@@ -1,7 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10.
+//   R1, R5, R7, R8, R9, R10, R11.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -143,6 +143,42 @@ function checkSceneLayerAssetReferences(project, out) {
 }
 
 /**
+ * R11 — A camera targetId must match the characterId of at least one actor
+ * in the same shot. One matching actor instance is sufficient.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkCameraTargetActorReferences(project, out) {
+  const shots = project.shots ?? [];
+
+  shots.forEach((shot, shotIndex) => {
+    if (!shot || typeof shot !== "object") return;
+    const targetId = shot.camera?.targetId;
+    if (typeof targetId !== "string") return;
+
+    const actors = Array.isArray(shot.actors) ? shot.actors : [];
+    const hasTargetActor = actors.some(
+      (actor) => actor && typeof actor === "object" &&
+        actor.characterId === targetId
+    );
+    if (hasTargetActor) return;
+
+    out.push(
+      makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING,
+        message:
+          `Camera targetId "${targetId}" does not match any actor characterId in this shot.`,
+        path: pointer(["shots", String(shotIndex), "camera", "targetId"]),
+        entityId: targetId,
+        context: { shotId: shot.id, targetId },
+      })
+    );
+  });
+}
+
+/**
  * R8 — Every shot.sceneId must resolve to an existing scene id.
  *
  * @param {Object} project
@@ -269,5 +305,6 @@ export function validateReferences(project) {
   checkSceneLayerAssetReferences(project, out); // R7
   checkShotSceneReferences(project, out);      // R8
   checkShotActorReferences(project, out);      // R9 + R10
+  checkCameraTargetActorReferences(project, out); // R11
   return { errors: out };
 }
