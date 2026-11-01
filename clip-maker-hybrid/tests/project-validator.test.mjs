@@ -1005,7 +1005,7 @@ test("§N1 R15 audio track resolves an asset in assets.audio", () => {
 });
 
 test("§N2 R15 reports an audio track with a missing asset", () => {
-  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const project = loadJson(join(REF_INVALID_DIR, "missing-audio-assets.json"));
   const result = validateProject(project);
   assert.ok(codesOf(result).includes(ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING));
 });
@@ -1019,8 +1019,7 @@ test("§N3 R16 music track resolves an asset in assets.audio", () => {
 });
 
 test("§N4 R16 reports a music track with a missing asset", () => {
-  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
-  project.timeline.musicTracks.push({ id: "music_track_1", assetId: "music_missing", start: 0 });
+  const project = loadJson(join(REF_INVALID_DIR, "missing-audio-assets.json"));
   const result = validateProject(project);
   assert.ok(codesOf(result).includes(ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING));
 });
@@ -1066,6 +1065,7 @@ test("§N7 R15/R16 report canonical paths and issue context", () => {
 
 test("§N8 absent optional audio registry reports referenced assets as missing", () => {
   const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  delete project.assets.audio;
   const result = validateProject(project);
   assert.ok(codesOf(result).includes(ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING));
 });
