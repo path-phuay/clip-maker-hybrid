@@ -4,10 +4,16 @@
     "id": "project_legacy",
     "title": "Imported v1",
     "fps": 30,
-    "resolution": { "width": 720, "height": 1280 },
+    "resolution": {
+      "width": 720,
+      "height": 1280
+    },
     "aspectRatio": "9:16",
     "duration": 4,
-    "style": { "preset": "cartoon", "consistency": "medium" }
+    "style": {
+      "preset": "cartoon",
+      "consistency": "medium"
+    }
   },
   "assets": {
     "characters": {
@@ -15,11 +21,22 @@
         "id": "char_legacy_1",
         "name": "Legacy Blob",
         "type": "emoji_fallback",
-        "views": { "front": "asset_emoji_1" }
+        "views": {
+          "front": "asset_emoji_1"
+        }
       }
     },
     "vector": {
-      "asset_emoji_1": { "id": "asset_emoji_1", "kind": "svg", "uri": "assets/emoji/1.svg" }
+      "asset_emoji_1": {
+        "id": "asset_emoji_1",
+        "kind": "svg",
+        "uri": "assets/emoji/1.svg"
+      },
+      "bg_legacy": {
+        "id": "bg_legacy",
+        "kind": "svg",
+        "uri": "assets/legacy/background.svg"
+      }
     }
   },
   "scenes": [
@@ -27,7 +44,14 @@
       "id": "scene_legacy_001",
       "title": "Legacy Scene",
       "layers": [
-        { "id": "bg", "type": "background", "depth": 0, "assetIds": ["bg_legacy"] }
+        {
+          "id": "bg",
+          "type": "background",
+          "depth": 0,
+          "assetIds": [
+            "bg_legacy"
+          ]
+        }
       ]
     }
   ],
@@ -37,21 +61,35 @@
       "sceneId": "scene_legacy_001",
       "start": 0,
       "duration": 4,
-      "camera": { "shotType": "medium", "angle": "eye_level" },
+      "camera": {
+        "shotType": "medium",
+        "angle": "eye_level"
+      },
       "actors": [
         {
           "characterId": "char_legacy_1",
           "view": "front",
-          "position": { "x": 0.5, "y": 0.7 },
+          "position": {
+            "x": 0.5,
+            "y": 0.7
+          },
           "facing": "front",
           "action": "idle"
         }
       ]
     }
   ],
-  "timeline": { "audioTracks": [], "subtitleTracks": [], "musicTracks": [] },
+  "timeline": {
+    "audioTracks": [],
+    "subtitleTracks": [],
+    "musicTracks": []
+  },
   "legacyData": {
     "sourceVersion": "v1",
-    "originalScene": { "theme": "road", "sky": "#0a0a1a", "ground": "#222" }
+    "originalScene": {
+      "theme": "road",
+      "sky": "#0a0a1a",
+      "ground": "#222"
+    }
   }
 }
