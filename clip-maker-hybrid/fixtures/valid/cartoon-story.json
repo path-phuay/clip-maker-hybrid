@@ -104,6 +104,12 @@
         "id": "rig_humanoid_basic",
         "uri": "assets/rigs/humanoid-basic.json"
       }
+    },
+    "audio": {
+      "voice_001": {
+        "id": "voice_001",
+        "uri": "assets/audio/voice-001.wav"
+      }
     }
   },
   "scenes": [
