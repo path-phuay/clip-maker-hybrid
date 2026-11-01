@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 + DS-07 tests. Run via `node --test tests/`.
+// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 + DS-07 + DS-08 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 86 tests
+// Total: 91 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -17,6 +17,7 @@
 //   §L  DS-05 R13 Character Rig Asset References (10)
 //   §M  DS-06 R14 Asset Registry Map Key Integrity (10)
 //   §N  DS-07 R15/R16 Audio and Music Asset References (10)
+//   §O  DS-08 R17 Audio Asset Map Key Integrity (5)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -1093,4 +1094,78 @@ test("§N10 R15/R16 validation does not mutate valid or invalid projects", () =>
   const result = validateProject(invalidProject);
   assert.ok(codesOf(result).includes(ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING));
   assert.deepEqual(invalidProject, invalidSnapshot);
+});
+
+
+// =========================================================================
+// §O  DS-08 R17 Audio Asset Map Key Integrity
+// =========================================================================
+
+test("§O1 R17 matching audio map key and id passes", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.assets.audio = { voice_001: { id: "voice_001", uri: "audio/voice.wav" } };
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+});
+
+test("§O2 R17 mismatched audio map key and id reports an error", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.assets.audio = { voice_001: { id: "voice_wrong", uri: "audio/voice.wav" } };
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].context.registry, "audio");
+});
+
+test("§O3 R17 reports every mismatch in the audio registry", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.assets.audio = {
+    voice_001: { id: "voice_wrong", uri: "audio/voice.wav" },
+    music_001: { id: "music_wrong", uri: "audio/music.mp3" }
+  };
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(e => e.context.mapKey), ["voice_001", "music_001"]);
+});
+
+test("§O4 R17 reports canonical path, issue code, entityId, and context", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.assets.audio = { voice_001: { id: "voice_wrong", uri: "audio/voice.wav" } };
+  const result = validateProject(project);
+  const error = result.errors.find(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH);
+  assert.ok(error);
+  assert.deepEqual(
+    { severity: error.severity, code: error.code, path: error.path, entityId: error.entityId, context: error.context },
+    {
+      severity: "error",
+      code: "REF_ASSET_MAP_KEY_MISMATCH",
+      path: "/assets/audio/voice_001/id",
+      entityId: "voice_001",
+      context: { registry: "audio", mapKey: "voice_001", declaredId: "voice_wrong" }
+    }
+  );
+});
+
+test("§O5 R17 schema-invalid projects skip reference validation and validation does not mutate input", () => {
+  const schemaInvalid = loadJson(join(VALID_DIR, "minimal-project.json"));
+  schemaInvalid.project.fps = 0;
+  schemaInvalid.assets.audio = { voice_001: { id: "voice_wrong", uri: "audio/voice.wav" } };
+  const invalidResult = validateProject(schemaInvalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!codesOf(invalidResult).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+
+  const validInput = loadJson(join(VALID_DIR, "minimal-project.json"));
+  validInput.assets.audio = { voice_001: { id: "voice_001", uri: "audio/voice.wav" } };
+  const validSnapshot = structuredClone(validInput);
+  validateProject(validInput);
+  assert.deepEqual(validInput, validSnapshot);
+
+  const referenceInvalid = loadJson(join(VALID_DIR, "minimal-project.json"));
+  referenceInvalid.assets.audio = { voice_001: { id: "voice_wrong", uri: "audio/voice.wav" } };
+  const referenceSnapshot = structuredClone(referenceInvalid);
+  const referenceResult = validateProject(referenceInvalid);
+  assert.ok(codesOf(referenceResult).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+  assert.deepEqual(referenceInvalid, referenceSnapshot);
 });
