@@ -1,16 +1,17 @@
 // tests/project-validator.test.mjs
-// DS-02 tests. Run via `node --test tests/`.
+// DS-02 + DS-03A tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 23 tests
+// Total: 35 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
-//   §C  Reference rules (R1,R5,R8,R9,R10)      (6)
+//   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
 //   §D  Multiple errors + immutability         (3)
 //   §E  Invalid input variants                 (4)
 //   §F  ISSUE_CODES export                     (1)
 //   §G  JSON Pointer escaping (helper)         (2)
 //   §H  Input guard robustness (Date/Map/class/Object.create(null)) (4)
+//   §I  DS-03A R7 Scene Layer Asset References (12)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -165,6 +166,153 @@ test("§C6 undeclared actor view fails via R10", () => {
   assert.equal(r10[0].context.requestedView, "back");
   assert.ok(r10[0].context.declaredViews.includes("front"));
   assert.ok(!r10[0].context.declaredViews.includes("back"));
+});
+
+// =========================================================================
+// §I  DS-03A — R7 Scene Layer Asset References
+// =========================================================================
+
+test("§I1 R7 resolves scene-layer assets from assets.vector", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING));
+});
+
+test("§I2 R7 resolves scene-layer assets from assets.props", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  const asset = project.assets.vector.asset_sky;
+  delete project.assets.vector.asset_sky;
+  project.assets.props = { asset_sky: asset };
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§I3 R7 resolves scene-layer assets from assets.graphics", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  const asset = project.assets.vector.asset_sky;
+  delete project.assets.vector.asset_sky;
+  project.assets.graphics = { asset_sky: asset };
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§I4 R7 reports a missing scene-layer asset with canonical issue fields", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-scene-layer-asset.json"));
+  const result = validateProject(project);
+
+  assert.equal(result.valid, false);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, "/scenes/0/layers/0/assetIds/0");
+  assert.equal(errors[0].entityId, "asset_missing_scene_layer");
+  assert.equal(errors[0].context.assetId, "asset_missing_scene_layer");
+});
+
+test("§I5 R7 reports only missing IDs in a mixed resolved/unresolved assetIds list", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.scenes[0].layers[0].assetIds = [
+    "asset_sky",
+    "asset_missing_a",
+    "asset_missing_b",
+  ];
+
+  const result = validateProject(project);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING);
+  assert.deepEqual(errors.map((e) => e.path), [
+    "/scenes/0/layers/0/assetIds/1",
+    "/scenes/0/layers/0/assetIds/2",
+  ]);
+  assert.deepEqual(errors.map((e) => e.entityId), ["asset_missing_a", "asset_missing_b"]);
+});
+
+test("§I6 R7 reports missing references from multiple layers", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.scenes[0].layers.push(
+    { id: "buildings", type: "environment", depth: 10, assetIds: ["asset_buildings_missing"] },
+    { id: "road", type: "ground", depth: 20, assetIds: ["asset_road_missing"] }
+  );
+
+  const result = validateProject(project);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING);
+  assert.deepEqual(errors.map((e) => e.path), [
+    "/scenes/0/layers/1/assetIds/0",
+    "/scenes/0/layers/2/assetIds/0",
+  ]);
+});
+
+test("§I7 R7 accepts an empty assetIds array", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.scenes[0].layers[0].assetIds = [];
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§I8 R7 safely searches remaining registries when optional registries are absent", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  const asset = project.assets.vector.asset_sky;
+  project.assets.vector = {};
+  project.assets.props = { asset_sky: asset };
+  // assets.graphics intentionally omitted.
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§I9 schema-invalid projects skip R7 reference validation", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.scenes[0].layers[0].depth = 101;
+  project.scenes[0].layers[0].assetIds = ["asset_missing_schema_invalid"];
+
+  const result = validateProject(project);
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.meta.layers, ["schema"]);
+  assert.equal(result.meta.referenceSkipped, true);
+  assert.ok(codesOf(result).every((code) => code.startsWith("SCHEMA_")));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING));
+});
+
+test("§I10 R7 reports all missing IDs across multiple scenes", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.scenes.push({
+    id: "scene_002",
+    title: "Second Scene",
+    layers: [
+      { id: "sky_2", type: "background", depth: 0, assetIds: ["asset_missing_scene_2"] },
+      { id: "foreground_2", type: "foreground", depth: 30, assetIds: ["asset_missing_scene_2b"] },
+    ],
+  });
+
+  const result = validateProject(project);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING);
+  assert.deepEqual(errors.map((e) => e.path), [
+    "/scenes/1/layers/0/assetIds/0",
+    "/scenes/1/layers/1/assetIds/0",
+  ]);
+});
+
+test("§I11 R7 validation does not mutate a valid project", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  const snapshot = structuredClone(project);
+
+  const result = validateProject(project);
+
+  assert.equal(result.valid, true);
+  assert.deepEqual(project, snapshot);
+});
+
+test("§I12 R7 validation does not mutate an invalid project", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-scene-layer-asset.json"));
+  const snapshot = structuredClone(project);
+
+  const result = validateProject(project);
+
+  assert.equal(result.valid, false);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING));
+  assert.deepEqual(project, snapshot);
 });
 
 // =========================================================================
