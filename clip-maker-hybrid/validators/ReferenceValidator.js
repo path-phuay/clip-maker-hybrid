@@ -673,6 +673,55 @@ function checkTimelineTrackProjectDurationBounds(project, out) {
   }
 }
 
+
+/**
+ * T6/T7 — Validate outgoing transition duration semantics.
+ * Non-cut transitions must have positive duration, and no transition may
+ * last longer than its owning shot. The rule does not infer adjacency or
+ * require a following shot.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkTransitionDurationSemantics(project, out) {
+  (project.shots ?? []).forEach((shot, shotIndex) => {
+    const transition = shot.transitionOut;
+    if (!transition) return;
+
+    if (transition.type !== "cut" && transition.duration <= 0) {
+      out.push(makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.TEMP_TRANSITION_DURATION_NOT_POSITIVE,
+        message: `Non-cut transition "${transition.type}" on shot "${shot.id}" must have a duration greater than 0s.`,
+        path: pointer(["shots", String(shotIndex), "transitionOut", "duration"]),
+        entityId: shot.id,
+        context: {
+          shotId: shot.id,
+          transitionType: transition.type,
+          transitionDuration: transition.duration
+        }
+      }));
+    }
+
+    if (transition.duration > shot.duration) {
+      out.push(makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.TEMP_TRANSITION_EXCEEDS_SHOT_DURATION,
+        message: `Transition on shot "${shot.id}" lasts ${transition.duration}s, longer than the shot duration ${shot.duration}s.`,
+        path: pointer(["shots", String(shotIndex), "transitionOut", "duration"]),
+        entityId: shot.id,
+        context: {
+          shotId: shot.id,
+          transitionType: transition.type,
+          transitionDuration: transition.duration,
+          shotDuration: shot.duration,
+          overflow: transition.duration - shot.duration
+        }
+      }));
+    }
+  });
+}
+
 /**
  * Run all approved reference and temporal rules against a schema-valid project.
  * Never mutates input.
@@ -698,5 +747,6 @@ export function validateReferences(project) {
   checkGraphicShotBounds(project, out); // T2
   checkShotProjectDurationBounds(project, out); // T3
   checkTimelineTrackProjectDurationBounds(project, out); // T5
+  checkTransitionDurationSemantics(project, out); // T6 + T7
   return { errors: out };
 }
