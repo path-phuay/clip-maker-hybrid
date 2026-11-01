@@ -1,7 +1,8 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18.
+//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18,
+//   T1 (shot overlap), T2 (graphic bounds).
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -472,8 +473,57 @@ function checkDuplicateEntityIds(project, out) {
   }
 }
 
+
+/** T1 — Half-open [start,end) shot intervals; gaps allowed; array order irrelevant. */
+function checkShotOverlaps(project, out) {
+  const ordered = (project.shots ?? []).map((shot, index) => ({
+    shot, index, start: shot.start, end: shot.start + shot.duration
+  })).sort((a, b) => a.start - b.start || a.end - b.end || a.index - b.index);
+  for (let i = 0; i < ordered.length; i += 1) {
+    const a = ordered[i];
+    for (let j = i + 1; j < ordered.length; j += 1) {
+      const b = ordered[j];
+      if (b.start >= a.end) break;
+      const overlapStart = Math.max(a.start, b.start);
+      const overlapEnd = Math.min(a.end, b.end);
+      if (overlapStart >= overlapEnd) continue;
+      out.push(makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.TEMP_SHOT_OVERLAP,
+        message: `Shot "${a.shot.id}" overlaps shot "${b.shot.id}" in the timeline.`,
+        path: pointer(["shots", String(b.index), "start"]),
+        entityId: b.shot.id,
+        context: {
+          firstShotId: a.shot.id, secondShotId: b.shot.id,
+          firstShotIndex: a.index, secondShotIndex: b.index,
+          overlapStart, overlapEnd
+        }
+      }));
+    }
+  }
+}
+
+/** T2 — graphic.start is absolute timeline seconds, per documented end formula. */
+function checkGraphicShotBounds(project, out) {
+  (project.shots ?? []).forEach((shot, shotIndex) => {
+    const shotEnd = shot.start + shot.duration;
+    (shot.graphics ?? []).forEach((graphic, graphicIndex) => {
+      const graphicEnd = graphic.start + graphic.duration;
+      if (graphicEnd <= shotEnd) return;
+      out.push(makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.TEMP_GRAPHIC_OUTSIDE_SHOT,
+        message: `Graphic "${graphic.id}" ends at ${graphicEnd}s, after shot "${shot.id}" ends at ${shotEnd}s.`,
+        path: pointer(["shots", String(shotIndex), "graphics", String(graphicIndex)]),
+        entityId: graphic.id,
+        context: { shotId: shot.id, graphicId: graphic.id, shotEnd, graphicEnd }
+      }));
+    });
+  });
+}
+
 /**
- * Run all approved reference rules against a schema-valid project.
+ * Run all approved reference and temporal rules against a schema-valid project.
  * Never mutates input.
  *
  * @param {Object} project
@@ -492,5 +542,7 @@ export function validateReferences(project) {
   checkCameraFocusTargetActorReferences(project, out); // R12
   checkTimelineAudioAssetReferences(project, out); // R15 + R16
   checkDuplicateEntityIds(project, out); // R18
+  checkShotOverlaps(project, out); // T1
+  checkGraphicShotBounds(project, out); // T2
   return { errors: out };
 }
