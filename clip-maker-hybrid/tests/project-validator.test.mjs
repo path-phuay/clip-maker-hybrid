@@ -2077,3 +2077,20 @@ test("§X7 R20 skips schema-invalid projects and never mutates input", () => {
   validateProject(valid);
   assert.deepEqual(valid, validSnapshot);
 });
+
+
+test("§X8 R20 reports a missing texture asset when assets.graphics is absent", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  delete p.assets.graphics;
+  p.shots[0].effects = [{
+    id: "effect_texture",
+    type: "texture_overlay",
+    assetId: "texture_missing"
+  }];
+  const e = validateProject(p).errors.find(x =>
+    x.code === ISSUE_CODES.REF_EFFECT_ASSET_MISSING
+  );
+  assert.ok(e);
+  assert.equal(e.context.registry, "graphics");
+  assert.equal(e.context.assetId, "texture_missing");
+});
