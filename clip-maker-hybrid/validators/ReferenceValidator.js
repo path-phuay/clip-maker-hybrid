@@ -523,6 +523,35 @@ function checkGraphicShotBounds(project, out) {
 }
 
 /**
+ * T3 — Every shot must end at or before project.duration.
+ * Trailing empty timeline space is allowed; this is an upper-bound check,
+ * not a requirement that the final shot end exactly at project.duration.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkShotProjectDurationBounds(project, out) {
+  const projectDuration = project.project.duration;
+  (project.shots ?? []).forEach((shot, shotIndex) => {
+    const shotEnd = shot.start + shot.duration;
+    if (shotEnd <= projectDuration) return;
+    out.push(makeIssue({
+      severity: "error",
+      code: ISSUE_CODES.TEMP_SHOT_EXCEEDS_PROJECT_DURATION,
+      message: `Shot "${shot.id}" ends at ${shotEnd}s, after project duration ${projectDuration}s.`,
+      path: pointer(["shots", String(shotIndex), "duration"]),
+      entityId: shot.id,
+      context: {
+        shotId: shot.id,
+        shotEnd,
+        projectDuration,
+        overflow: shotEnd - projectDuration
+      }
+    }));
+  });
+}
+
+/**
  * Run all approved reference and temporal rules against a schema-valid project.
  * Never mutates input.
  *
@@ -544,5 +573,6 @@ export function validateReferences(project) {
   checkDuplicateEntityIds(project, out); // R18
   checkShotOverlaps(project, out); // T1
   checkGraphicShotBounds(project, out); // T2
+  checkShotProjectDurationBounds(project, out); // T3
   return { errors: out };
 }
