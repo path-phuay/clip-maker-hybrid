@@ -6,7 +6,7 @@
 //      documented input contract below)
 //   2. Layer A — schema validation
 //      • If fails → skip Layer B entirely (per Owner Q1=A)
-//   3. Layer B — semantic validation: references, temporal integrity, and composition (R1,R5,R7-R20,T1-T7,C1)
+//   3. Layer B — semantic validation: references, temporal integrity, and composition (R1,R5,R7-R20,T1-T7,C1,DS-09E3B)
 //
 // INPUT CONTRACT (narrowed per Architecture Owner DS-02 Round 2.3 review):
 //
