@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 through DS-09C4 tests. Run via `node --test tests/`.
+// DS-02 through DS-09D3 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 141 tests
+// Total: 148 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -24,6 +24,7 @@
 //   §S  DS-09C2 T4 Graphic Start Bounds (7)
 //   §T  DS-09C3 T5 Timeline Track Project Duration Bounds (9)
 //   §U  DS-09C4 T6/T7 Transition Duration Semantics (8)
+//   §V  DS-09D3 C1 Consecutive Camera Shot Type Variety (7)
 //
 // Total: 141 tests
 
@@ -1768,4 +1769,97 @@ test("§U8 T6/T7 skip schema-invalid projects and never mutate input", () => {
   const validSnapshot = structuredClone(valid);
   validateProject(valid);
   assert.deepEqual(valid, validSnapshot);
+});
+
+
+// =========================================================================
+// §V  DS-09D3 C1 Consecutive Camera Shot Type Variety
+// =========================================================================
+
+test("§V1 C1 accepts consecutive shots with different shot types", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].camera.shotType = "wide";
+  p.shots[1].camera.shotType = "close_up";
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT);
+  assert.equal(errors.length, 0);
+});
+
+test("§V2 C1 reports consecutive chronological shots with the same shot type", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].camera.shotType = "wide";
+  p.shots[1].camera.shotType = "wide";
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT);
+  assert.ok(e);
+  assert.equal(e.severity, "error");
+  assert.equal(e.path, "/shots/1/camera/shotType");
+  assert.equal(e.entityId, p.shots[1].id);
+  assert.deepEqual(e.context, {
+    previousShotId: p.shots[0].id,
+    currentShotId: p.shots[1].id,
+    shotType: "wide",
+    previousShotIndex: 0,
+    currentShotIndex: 1
+  });
+});
+
+test("§V3 C1 uses chronological order rather than shots array order", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const first = { ...p.shots[0], id: "later", start: 5, camera: { ...p.shots[0].camera, shotType: "wide" } };
+  const second = { ...p.shots[1], id: "earlier", start: 0, camera: { ...p.shots[1].camera, shotType: "wide" } };
+  p.shots = [first, second];
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT);
+  assert.ok(e);
+  assert.equal(e.entityId, "later");
+  assert.equal(e.path, "/shots/0/camera/shotType");
+  assert.equal(e.context.previousShotId, "earlier");
+  assert.equal(e.context.currentShotId, "later");
+});
+
+test("§V4 C1 reports every consecutive repeated shot type", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const base = p.shots[0];
+  p.shots = [
+    { ...base, id: "s1", start: 0, camera: { ...base.camera, shotType: "wide" } },
+    { ...base, id: "s2", start: 2, camera: { ...base.camera, shotType: "wide" } },
+    { ...base, id: "s3", start: 4, camera: { ...base.camera, shotType: "wide" } },
+    { ...base, id: "s4", start: 6, camera: { ...base.camera, shotType: "close_up" } }
+  ];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(e => e.entityId), ["s2", "s3"]);
+});
+
+test("§V5 C1 allows the same shot type when another shot type separates them", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const base = p.shots[0];
+  p.shots = [
+    { ...base, id: "s1", start: 0, camera: { ...base.camera, shotType: "wide" } },
+    { ...base, id: "s2", start: 2, camera: { ...base.camera, shotType: "medium" } },
+    { ...base, id: "s3", start: 4, camera: { ...base.camera, shotType: "wide" } }
+  ];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT);
+  assert.equal(errors.length, 0);
+});
+
+test("§V6 C1 skips schema-invalid projects and never mutates input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.shots[0].camera.shotType = invalid.shots[1].camera.shotType;
+  const invalidSnapshot = structuredClone(invalid);
+  const result = validateProject(invalid);
+  assert.equal(result.meta.referenceSkipped, true);
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT));
+  assert.deepEqual(invalid, invalidSnapshot);
+
+  const valid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const snapshot = structuredClone(valid);
+  validateProject(valid);
+  assert.deepEqual(valid, snapshot);
+});
+
+test("§V7 C1 does not report projects with fewer than two shots", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots = [p.shots[0]];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT);
+  assert.equal(errors.length, 0);
 });
