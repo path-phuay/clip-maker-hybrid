@@ -19,9 +19,9 @@
 //   §N  DS-07 R15/R16 Audio and Music Asset References (10)
 //   §O  DS-08 R17 Audio Asset Map Key Integrity (5)
 //   §P  DS-09A R18 Duplicate Scene/Shot IDs (5)
-//   §Q  DS-09B T1/T2 Temporal Integrity (8)
+//   §Q  DS-09B T1/T2/T3 Temporal Integrity (13)
 //
-// Total: 104 tests
+// Total: 109 tests
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -1249,7 +1249,63 @@ test("§P5 R18 schema-invalid projects skip duplicate checks and validation does
 });
 
 
- // =========================================================================
+ 
+test("§Q9 T3 accepts a shot ending exactly at project.duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].start = 8;
+  p.shots[1].duration = 4;
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_SHOT_EXCEEDS_PROJECT_DURATION));
+});
+
+test("§Q10 T3 rejects a shot ending after project.duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].start = 8;
+  p.shots[1].duration = 4.1;
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.TEMP_SHOT_EXCEEDS_PROJECT_DURATION);
+  assert.ok(e);
+  assert.deepEqual(
+    { path: e.path, entityId: e.entityId, context: e.context },
+    {
+      path: "/shots/1/duration",
+      entityId: "shot_002",
+      context: { shotId: "shot_002", shotEnd: 12.1, projectDuration: 12, overflow: 0.09999999999999964 }
+    }
+  );
+});
+
+test("§Q11 T3 allows trailing empty timeline space", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  assert.equal(p.project.duration, 12);
+  assert.equal(Math.max(...p.shots.map(s => s.start + s.duration)), 7.5);
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_SHOT_EXCEEDS_PROJECT_DURATION));
+});
+
+test("§Q12 T3 reports every shot exceeding project.duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots = [
+    { ...structuredClone(p.shots[0]), id: "shot_late_a", start: 10, duration: 3 },
+    { ...structuredClone(p.shots[1]), id: "shot_late_b", start: 11, duration: 2 }
+  ];
+  const errors = validateProject(p).errors.filter(x => x.code === ISSUE_CODES.TEMP_SHOT_EXCEEDS_PROJECT_DURATION);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(x => x.entityId), ["shot_late_a", "shot_late_b"]);
+});
+
+test("§Q13 T3 skips schema-invalid projects and does not mutate input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.shots[1].start = 11;
+  const invalidResult = validateProject(invalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!codesOf(invalidResult).includes(ISSUE_CODES.TEMP_SHOT_EXCEEDS_PROJECT_DURATION));
+
+  const valid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const snapshot = structuredClone(valid);
+  validateProject(valid);
+  assert.deepEqual(valid, snapshot);
+});
+
+// =========================================================================
  // §Q  DS-09B T1/T2 Temporal Integrity
  // =========================================================================
 
