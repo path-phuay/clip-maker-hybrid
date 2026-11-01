@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 + DS-03A tests. Run via `node --test tests/`.
+// DS-02 + DS-03A + DS-03B tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 35 tests
+// Total: 45 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -12,6 +12,7 @@
 //   §G  JSON Pointer escaping (helper)         (2)
 //   §H  Input guard robustness (Date/Map/class/Object.create(null)) (4)
 //   §I  DS-03A R7 Scene Layer Asset References (12)
+//   §J  DS-03B R11 Camera Target Actor References (10)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -313,6 +314,151 @@ test("§I12 R7 validation does not mutate an invalid project", () => {
   assert.equal(result.valid, false);
   assert.ok(codesOf(result).includes(ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING));
   assert.deepEqual(project, snapshot);
+});
+
+// =========================================================================
+// §J  DS-03B — R11 Camera Target Actor References
+// =========================================================================
+
+function makeActor(characterId) {
+  return {
+    characterId,
+    view: "front",
+    position: { x: 0.5, y: 0.5 },
+    facing: "right",
+    action: "idle",
+  };
+}
+
+test("§J1 R11 accepts a targetId matching an actor in the same shot", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.targetId = "char_hero";
+  project.shots[0].actors = [makeActor("char_hero")];
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING));
+});
+
+test("§J2 R11 reports targetId when no actor in the shot matches", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-camera-target-actor.json"));
+  const result = validateProject(project);
+
+  assert.equal(result.valid, false);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, "/shots/0/camera/targetId");
+  assert.equal(errors[0].entityId, "char_missing_target");
+  assert.deepEqual(errors[0].context, { shotId: "shot_001", targetId: "char_missing_target" });
+});
+
+test("§J3 R11 does not resolve an actor found only in another shot", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.targetId = "char_hero";
+  project.shots.push({
+    id: "shot_002",
+    sceneId: "scene_001",
+    start: 3,
+    duration: 3,
+    camera: { shotType: "medium", angle: "eye_level" },
+    actors: [makeActor("char_hero")],
+  });
+
+  const result = validateProject(project);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, "/shots/0/camera/targetId");
+});
+
+test("§J4 R11 reports a target when the shot has no actors", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-camera-target-actor.json"));
+  const result = validateProject(project);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING));
+});
+
+test("§J5 R11 accepts a camera without targetId", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING));
+});
+
+test("§J6 R11 accepts one matching actor among multiple actors", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.targetId = "char_hero";
+  project.shots[0].actors = [makeActor("char_other"), makeActor("char_hero")];
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§J7 R11 reports only shots whose camera target is unresolved", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.targetId = "char_missing_a";
+  project.shots.push({
+    id: "shot_002",
+    sceneId: "scene_001",
+    start: 3,
+    duration: 3,
+    camera: { shotType: "medium", angle: "eye_level", targetId: "char_hero" },
+    actors: [makeActor("char_hero")],
+  });
+  project.shots.push({
+    id: "shot_003",
+    sceneId: "scene_001",
+    start: 6,
+    duration: 3,
+    camera: { shotType: "medium", angle: "eye_level", targetId: "char_missing_b" },
+    actors: [],
+  });
+
+  const result = validateProject(project);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING);
+  assert.deepEqual(errors.map((e) => e.path), [
+    "/shots/0/camera/targetId",
+    "/shots/2/camera/targetId",
+  ]);
+  assert.deepEqual(errors.map((e) => e.entityId), ["char_missing_a", "char_missing_b"]);
+});
+
+test("§J8 schema-invalid projects skip R11 reference validation", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-camera-target-actor.json"));
+  project.project.resolution.width = 0;
+
+  const result = validateProject(project);
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.meta.layers, ["schema"]);
+  assert.equal(result.meta.referenceSkipped, true);
+  assert.ok(codesOf(result).every((code) => code.startsWith("SCHEMA_")));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING));
+});
+
+test("§J9 R11 reports canonical JSON Pointer and entityId", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-camera-target-actor.json"));
+  const result = validateProject(project);
+  const error = result.errors.find((e) => e.code === ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING);
+
+  assert.ok(error);
+  assert.equal(error.severity, "error");
+  assert.equal(error.path, "/shots/0/camera/targetId");
+  assert.equal(error.entityId, "char_missing_target");
+});
+
+test("§J10 R11 validation does not mutate valid or invalid projects", () => {
+  const validProject = loadJson(join(VALID_DIR, "minimal-project.json"));
+  validProject.shots[0].camera.targetId = "char_hero";
+  validProject.shots[0].actors = [makeActor("char_hero")];
+  const validSnapshot = structuredClone(validProject);
+  const validResult = validateProject(validProject);
+  assert.equal(validResult.valid, true);
+  assert.deepEqual(validProject, validSnapshot);
+
+  const invalidProject = loadJson(join(REF_INVALID_DIR, "missing-camera-target-actor.json"));
+  const invalidSnapshot = structuredClone(invalidProject);
+  const invalidResult = validateProject(invalidProject);
+  assert.equal(invalidResult.valid, false);
+  assert.ok(codesOf(invalidResult).includes(ISSUE_CODES.REF_CAMERA_TARGET_ACTOR_MISSING));
+  assert.deepEqual(invalidProject, invalidSnapshot);
 });
 
 // =========================================================================
