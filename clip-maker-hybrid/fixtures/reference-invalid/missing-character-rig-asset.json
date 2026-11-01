@@ -98,6 +98,12 @@
         "kind": "svg",
         "uri": "assets/environment/rain-foreground.svg"
       }
+    },
+    "audio": {
+      "voice_001": {
+        "id": "voice_001",
+        "uri": "assets/audio/voice-001.wav"
+      }
     }
   },
   "scenes": [
