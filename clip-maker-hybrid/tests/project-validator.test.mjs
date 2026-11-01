@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 through DS-09C1 tests. Run via `node --test tests/`.
+// DS-02 through DS-09C2 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 117 tests
+// Total: 124 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -22,7 +22,7 @@
 //   §Q  DS-09B T1/T2/T3 Temporal Integrity (13)
 //   §R  DS-09C1 Nested Collection Duplicate IDs (8)
 //
-// Total: 117 tests
+// Total: 124 tests
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -1484,4 +1484,80 @@ test("§R8 R18 valid project passes nested ID checks without mutation", () => {
   const result = validateProject(p);
   assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
   assert.deepEqual(p, snapshot);
+});
+
+
+// =========================================================================
+// §S  DS-09C2 T4 Graphic Start Bounds
+// =========================================================================
+
+test("§S1 T4 accepts a graphic starting exactly at its shot start", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].graphics = [{ id: "graphic_at_start", type: "text", text: "Start", start: 3.5, duration: 1 }];
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT));
+});
+
+test("§S2 T4 rejects a graphic starting before its containing shot", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].graphics = [{ id: "graphic_early", type: "text", text: "Early", start: 3.4, duration: 1 }];
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT);
+  assert.ok(e);
+  assert.deepEqual({ path: e.path, entityId: e.entityId, context: e.context }, {
+    path: "/shots/1/graphics/0/start",
+    entityId: "graphic_early",
+    context: {
+      shotId: "shot_002",
+      graphicId: "graphic_early",
+      shotStart: 3.5,
+      graphicStart: 3.4,
+      offset: 0.1
+    }
+  });
+});
+
+test("§S3 T4 reports every graphic starting before its shot", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].graphics = [
+    { id: "graphic_early_a", type: "text", text: "A", start: 2, duration: 0.5 },
+    { id: "graphic_early_b", type: "text", text: "B", start: 3, duration: 0.2 }
+  ];
+  const errors = validateProject(p).errors.filter(x => x.code === ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(x => x.entityId), ["graphic_early_a", "graphic_early_b"]);
+});
+
+test("§S4 T4 uses absolute timeline start values, not shot-relative offsets", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].graphics = [{ id: "graphic_absolute", type: "text", text: "Later", start: 3.6, duration: 1 }];
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT));
+});
+
+test("§S5 T4 is independent of T2 graphic end bounds", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].graphics = [{ id: "graphic_early_end_valid", type: "text", text: "Early", start: 3, duration: 1 }];
+  const errors = validateProject(p).errors;
+  assert.ok(errors.some(x => x.code === ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT));
+  assert.ok(!errors.some(x => x.code === ISSUE_CODES.TEMP_GRAPHIC_OUTSIDE_SHOT));
+});
+
+test("§S6 T4 skips schema-invalid projects and never mutates input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.shots[1].graphics = [{ id: "graphic_early", type: "text", text: "Early", start: 2, duration: 1 }];
+  const invalidSnapshot = structuredClone(invalid);
+  const invalidResult = validateProject(invalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!codesOf(invalidResult).includes(ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT));
+  assert.deepEqual(invalid, invalidSnapshot);
+
+  const valid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const validSnapshot = structuredClone(valid);
+  validateProject(valid);
+  assert.deepEqual(valid, validSnapshot);
+});
+
+test("§S7 T4 does not report shots without graphics", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].graphics = [];
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT));
 });
