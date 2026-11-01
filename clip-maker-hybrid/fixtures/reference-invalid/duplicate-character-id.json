@@ -4,10 +4,15 @@
     "id": "project_min",
     "title": "Minimal",
     "fps": 30,
-    "resolution": { "width": 720, "height": 1280 },
+    "resolution": {
+      "width": 720,
+      "height": 1280
+    },
     "aspectRatio": "9:16",
     "duration": 3,
-    "style": { "preset": "cinematic_cartoon" }
+    "style": {
+      "preset": "cinematic_cartoon"
+    }
   },
   "assets": {
     "characters": {
@@ -15,7 +20,9 @@
         "id": "char_other",
         "name": "Hero",
         "type": "static_svg",
-        "views": { "front": "asset_hero_front" }
+        "views": {
+          "front": "asset_hero_front"
+        }
       }
     },
     "vector": {
@@ -25,6 +32,13 @@
         "uri": "assets/characters/hero/front.svg",
         "width": 512,
         "height": 512
+      },
+      "asset_sky": {
+        "id": "asset_sky",
+        "kind": "svg",
+        "uri": "assets/environment/sky.svg",
+        "width": 720,
+        "height": 1280
       }
     }
   },
@@ -33,7 +47,14 @@
       "id": "scene_001",
       "title": "Night Street",
       "layers": [
-        { "id": "sky", "type": "background", "depth": 0, "assetIds": ["asset_sky"] }
+        {
+          "id": "sky",
+          "type": "background",
+          "depth": 0,
+          "assetIds": [
+            "asset_sky"
+          ]
+        }
       ]
     }
   ],
