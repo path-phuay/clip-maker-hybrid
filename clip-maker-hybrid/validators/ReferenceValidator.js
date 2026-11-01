@@ -1,7 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R8, R9, R10.
+//   R1, R5, R7, R8, R9, R10.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -91,6 +91,55 @@ function checkCharacterViewAssets(project, out) {
       }
     }
   }
+}
+
+/**
+ * R7 — Every scene-layer asset id must resolve in at least one asset registry:
+ * assets.vector, assets.props, or assets.graphics.
+ *
+ * Registry membership is based on own keys. A single matching registry is
+ * sufficient; optional registries may be absent. Schema validation guarantees
+ * the referenced collection shapes before this function is called.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkSceneLayerAssetReferences(project, out) {
+  const vector = project.assets?.vector ?? {};
+  const props = project.assets?.props ?? {};
+  const graphics = project.assets?.graphics ?? {};
+  const registries = [vector, props, graphics];
+
+  project.scenes.forEach((scene, sceneIndex) => {
+    scene.layers.forEach((layer, layerIndex) => {
+      layer.assetIds.forEach((assetId, assetIndex) => {
+        const exists = registries.some((registry) =>
+          Object.prototype.hasOwnProperty.call(registry, assetId)
+        );
+        if (exists) return;
+
+        out.push(
+          makeIssue({
+            severity: "error",
+            code: ISSUE_CODES.REF_SCENE_LAYER_ASSET_MISSING,
+            message:
+              `Scene layer references asset "${assetId}" which does not exist ` +
+              "in assets.vector, assets.props, or assets.graphics.",
+            path: pointer([
+              "scenes",
+              String(sceneIndex),
+              "layers",
+              String(layerIndex),
+              "assetIds",
+              String(assetIndex),
+            ]),
+            entityId: assetId,
+            context: { assetId, sceneIndex, layerIndex, assetIndex },
+          })
+        );
+      });
+    });
+  });
 }
 
 /**
@@ -217,6 +266,7 @@ export function validateReferences(project) {
   const out = [];
   checkCharacterMapKeyIntegrity(project, out); // R1
   checkCharacterViewAssets(project, out);      // R5
+  checkSceneLayerAssetReferences(project, out); // R7
   checkShotSceneReferences(project, out);      // R8
   checkShotActorReferences(project, out);      // R9 + R10
   return { errors: out };
