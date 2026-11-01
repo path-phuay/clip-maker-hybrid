@@ -2094,3 +2094,161 @@ test("§X8 R20 reports a missing texture asset when assets.graphics is absent", 
   assert.equal(e.context.registry, "graphics");
   assert.equal(e.context.assetId, "texture_missing");
 });
+
+
+// =========================================================================
+// §Y  DS-09E3B Effect Parameter Contract v1
+// =========================================================================
+
+test("§Y1 DS-09E3 accepts omitted params for every contracted Effect Type", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [
+    "color_adjustment", "blur", "drop_shadow",
+    "glow", "vignette", "film_grain", "texture_overlay"
+  ].map((type, index) => ({
+    id: `effect_${index}`,
+    type,
+    ...(type === "texture_overlay" ? { assetId: "texture_asset" } : {})
+  }));
+  p.assets.graphics ??= {};
+  p.assets.graphics.texture_asset = {
+    id: "texture_asset", kind: "svg", uri: "assets/texture.svg"
+  };
+  const codes = [
+    ISSUE_CODES.REF_EFFECT_PARAMS_INVALID,
+    ISSUE_CODES.REF_EFFECT_PARAM_UNKNOWN,
+    ISSUE_CODES.REF_EFFECT_PARAM_TYPE_INVALID,
+    ISSUE_CODES.REF_EFFECT_PARAM_OUT_OF_RANGE,
+    ISSUE_CODES.REF_EFFECT_PARAM_FORMAT_INVALID
+  ];
+  assert.equal(validateProject(p).errors.filter(e => codes.includes(e.code)).length, 0);
+});
+
+test("§Y2 DS-09E3 accepts valid boundary values for numeric parameters", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [
+    { id: "a", type: "color_adjustment", params: { brightness: -1, contrast: 2, saturation: 0 } },
+    { id: "b", type: "blur", params: { radius: 100 } },
+    { id: "c", type: "drop_shadow", params: { offsetX: -100, offsetY: 100, blurRadius: 0, opacity: 1 } },
+    { id: "d", type: "glow", params: { intensity: 2, radius: 0 } },
+    { id: "e", type: "vignette", params: { intensity: 0, radius: 1 } },
+    { id: "f", type: "film_grain", params: { amount: 1, size: 0 } },
+    { id: "g", type: "texture_overlay", assetId: "texture_asset", params: { opacity: 0, blendMode: "soft-light" } }
+  ];
+  p.assets.graphics ??= {};
+  p.assets.graphics.texture_asset = { id: "texture_asset", kind: "svg", uri: "assets/texture.svg" };
+  const codes = [
+    ISSUE_CODES.REF_EFFECT_PARAMS_INVALID,
+    ISSUE_CODES.REF_EFFECT_PARAM_UNKNOWN,
+    ISSUE_CODES.REF_EFFECT_PARAM_TYPE_INVALID,
+    ISSUE_CODES.REF_EFFECT_PARAM_OUT_OF_RANGE,
+    ISSUE_CODES.REF_EFFECT_PARAM_FORMAT_INVALID
+  ];
+  assert.equal(validateProject(p).errors.filter(e => codes.includes(e.code)).length, 0);
+});
+
+test("§Y3 DS-09E3 rejects params that are not an object", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [{ id: "blur_1", type: "blur", params: [] }];
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.REF_EFFECT_PARAMS_INVALID);
+  assert.ok(e);
+  assert.equal(e.path, "/shots/0/effects/0/params");
+  assert.equal(e.entityId, "blur_1");
+});
+
+test("§Y4 DS-09E3 rejects unknown parameters for a contracted Effect Type", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [{ id: "blur_1", type: "blur", params: { strength: 5 } }];
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.REF_EFFECT_PARAM_UNKNOWN);
+  assert.ok(e);
+  assert.equal(e.path, "/shots/0/effects/0/params/strength");
+  assert.equal(e.context.parameter, "strength");
+});
+
+test("§Y5 DS-09E3 rejects incorrect parameter data types", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [{ id: "blur_1", type: "blur", params: { radius: "12" } }];
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.REF_EFFECT_PARAM_TYPE_INVALID);
+  assert.ok(e);
+  assert.equal(e.path, "/shots/0/effects/0/params/radius");
+  assert.equal(e.context.expectedType, "number");
+});
+
+test("§Y6 DS-09E3 rejects numeric parameters outside inclusive bounds", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [{ id: "blur_1", type: "blur", params: { radius: 100.01 } }];
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.REF_EFFECT_PARAM_OUT_OF_RANGE);
+  assert.ok(e);
+  assert.equal(e.path, "/shots/0/effects/0/params/radius");
+  assert.equal(e.context.min, 0);
+  assert.equal(e.context.max, 100);
+});
+
+test("§Y7 DS-09E3 validates Hex color formats and texture blend modes", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [
+    { id: "shadow_1", type: "drop_shadow", params: { color: "red" } },
+    { id: "texture_1", type: "texture_overlay", assetId: "texture_asset", params: { blendMode: "hard-light" } }
+  ];
+  p.assets.graphics ??= {};
+  p.assets.graphics.texture_asset = { id: "texture_asset", kind: "svg", uri: "assets/texture.svg" };
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_EFFECT_PARAM_FORMAT_INVALID);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(e => e.path), [
+    "/shots/0/effects/0/params/color",
+    "/shots/0/effects/1/params/blendMode"
+  ]);
+});
+
+test("§Y8 DS-09E3 reports multiple invalid parameters in one Effect", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [{
+    id: "color_1",
+    type: "color_adjustment",
+    params: { brightness: 2, contrast: "high", unknown: true }
+  }];
+  const errors = validateProject(p).errors.filter(e =>
+    [
+      ISSUE_CODES.REF_EFFECT_PARAM_UNKNOWN,
+      ISSUE_CODES.REF_EFFECT_PARAM_TYPE_INVALID,
+      ISSUE_CODES.REF_EFFECT_PARAM_OUT_OF_RANGE
+    ].includes(e.code)
+  );
+  assert.equal(errors.length, 3);
+});
+
+test("§Y9 DS-09E3 leaves unknown Effect Types forward-compatible", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [{
+    id: "future_1",
+    type: "future_custom_effect",
+    params: { arbitrary: { nested: true } }
+  }];
+  const codes = [
+    ISSUE_CODES.REF_EFFECT_PARAMS_INVALID,
+    ISSUE_CODES.REF_EFFECT_PARAM_UNKNOWN,
+    ISSUE_CODES.REF_EFFECT_PARAM_TYPE_INVALID,
+    ISSUE_CODES.REF_EFFECT_PARAM_OUT_OF_RANGE,
+    ISSUE_CODES.REF_EFFECT_PARAM_FORMAT_INVALID
+  ];
+  assert.equal(validateProject(p).errors.filter(e => codes.includes(e.code)).length, 0);
+});
+
+test("§Y10 DS-09E3 skips schema-invalid projects and never mutates input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.shots[0].effects = [{ id: "blur_1", type: "blur", params: { radius: 200 } }];
+  const invalidSnapshot = structuredClone(invalid);
+  const invalidResult = validateProject(invalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!invalidResult.errors.some(e =>
+    e.code === ISSUE_CODES.REF_EFFECT_PARAM_OUT_OF_RANGE
+  ));
+  assert.deepEqual(invalid, invalidSnapshot);
+
+  const valid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  valid.shots[0].effects = [{ id: "blur_1", type: "blur", params: { radius: 200 } }];
+  const validSnapshot = structuredClone(valid);
+  validateProject(valid);
+  assert.deepEqual(valid, validSnapshot);
+});
