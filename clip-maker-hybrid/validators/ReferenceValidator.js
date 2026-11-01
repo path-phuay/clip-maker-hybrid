@@ -1,7 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10, R11, R12, R13.
+//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -140,6 +140,38 @@ function checkSceneLayerAssetReferences(project, out) {
       });
     });
   });
+}
+
+
+/**
+ * R14 — Every asset entry in vector, props, graphics, and rigs registries
+ * must declare an id equal to its containing map key.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkAssetRegistryMapKeyIntegrity(project, out) {
+  const registries = ["vector", "props", "graphics", "rigs"];
+  for (const registryName of registries) {
+    const registry = project.assets?.[registryName];
+    if (!registry || typeof registry !== "object") continue;
+
+    for (const [mapKey, asset] of Object.entries(registry)) {
+      if (!asset || typeof asset !== "object" || asset.id === mapKey) continue;
+      out.push(
+        makeIssue({
+          severity: "error",
+          code: ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH,
+          message:
+            `Asset map key "${mapKey}" does not match declared id "${asset.id}" ` +
+            `in assets.${registryName}.`,
+          path: pointer(["assets", registryName, mapKey, "id"]),
+          entityId: mapKey,
+          context: { registry: registryName, mapKey, declaredId: asset.id },
+        })
+      );
+    }
+  }
 }
 
 /**
@@ -371,6 +403,7 @@ function checkCameraFocusTargetActorReferences(project, out) {
 export function validateReferences(project) {
   const out = [];
   checkCharacterMapKeyIntegrity(project, out); // R1
+  checkAssetRegistryMapKeyIntegrity(project, out); // R14
   checkCharacterViewAssets(project, out);      // R5
   checkCharacterRigAssetReferences(project, out); // R13
   checkSceneLayerAssetReferences(project, out); // R7
