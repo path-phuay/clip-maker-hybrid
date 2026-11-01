@@ -545,6 +545,35 @@ function checkShotOverlaps(project, out) {
   }
 }
 
+/**
+ * T4 — A graphic's absolute timeline start must be at or after its
+ * containing shot's start. T2 separately enforces the upper/end bound.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkGraphicStartBounds(project, out) {
+  (project.shots ?? []).forEach((shot, shotIndex) => {
+    (shot.graphics ?? []).forEach((graphic, graphicIndex) => {
+      if (graphic.start >= shot.start) return;
+      out.push(makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT,
+        message: `Graphic "${graphic.id}" starts at ${graphic.start}s, before shot "${shot.id}" starts at ${shot.start}s.`,
+        path: pointer(["shots", String(shotIndex), "graphics", String(graphicIndex), "start"]),
+        entityId: graphic.id,
+        context: {
+          shotId: shot.id,
+          graphicId: graphic.id,
+          shotStart: shot.start,
+          graphicStart: graphic.start,
+          offset: shot.start - graphic.start
+        }
+      }));
+    });
+  });
+}
+
 /** T2 — graphic.start is absolute timeline seconds, per documented end formula. */
 function checkGraphicShotBounds(project, out) {
   (project.shots ?? []).forEach((shot, shotIndex) => {
@@ -614,6 +643,7 @@ export function validateReferences(project) {
   checkTimelineAudioAssetReferences(project, out); // R15 + R16
   checkDuplicateEntityIds(project, out); // R18
   checkShotOverlaps(project, out); // T1
+  checkGraphicStartBounds(project, out); // T4
   checkGraphicShotBounds(project, out); // T2
   checkShotProjectDurationBounds(project, out); // T3
   return { errors: out };
