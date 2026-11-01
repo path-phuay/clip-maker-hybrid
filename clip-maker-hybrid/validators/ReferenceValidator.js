@@ -1,7 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16.
+//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -151,7 +151,7 @@ function checkSceneLayerAssetReferences(project, out) {
  * @param {import("./issues.js").Issue[]} out
  */
 function checkAssetRegistryMapKeyIntegrity(project, out) {
-  const registries = ["vector", "props", "graphics", "rigs"];
+  const registries = ["vector", "props", "graphics", "rigs", "audio"];
   for (const registryName of registries) {
     const registry = project.assets?.[registryName];
     if (!registry || typeof registry !== "object") continue;
@@ -439,7 +439,7 @@ function checkCameraFocusTargetActorReferences(project, out) {
 export function validateReferences(project) {
   const out = [];
   checkCharacterMapKeyIntegrity(project, out); // R1
-  checkAssetRegistryMapKeyIntegrity(project, out); // R14
+  checkAssetRegistryMapKeyIntegrity(project, out); // R14 + R17
   checkCharacterViewAssets(project, out);      // R5
   checkCharacterRigAssetReferences(project, out); // R13
   checkSceneLayerAssetReferences(project, out); // R7
