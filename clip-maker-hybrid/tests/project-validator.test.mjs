@@ -254,9 +254,9 @@ test("§I7 R7 accepts an empty assetIds array", () => {
 test("§I8 R7 safely searches remaining registries when optional registries are absent", () => {
   const project = loadJson(join(VALID_DIR, "minimal-project.json"));
   const asset = project.assets.vector.asset_sky;
-  project.assets.vector = {};
+  delete project.assets.vector.asset_sky;
   project.assets.props = { asset_sky: asset };
-  // assets.graphics intentionally omitted.
+  // assets.vector retains the character-view asset; assets.graphics is omitted.
 
   const result = validateProject(project);
   assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
