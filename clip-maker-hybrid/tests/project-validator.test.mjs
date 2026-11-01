@@ -1,5 +1,5 @@
 // tests/project-validator.test.mjs
-// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 + DS-07 + DS-08 + DS-09A tests. Run via `node --test tests/`.
+// DS-02 through DS-09B tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
 // Total: 91 tests
@@ -19,8 +19,9 @@
 //   §N  DS-07 R15/R16 Audio and Music Asset References (10)
 //   §O  DS-08 R17 Audio Asset Map Key Integrity (5)
 //   §P  DS-09A R18 Duplicate Scene/Shot IDs (5)
+//   §Q  DS-09B T1/T2 Temporal Integrity (8)
 //
-// Total: 96 tests
+// Total: 104 tests
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -1247,3 +1248,80 @@ test("§P5 R18 schema-invalid projects skip duplicate checks and validation does
   assert.deepEqual(duplicate, duplicateSnapshot);
 });
 
+
+ // =========================================================================
+ // §Q  DS-09B T1/T2 Temporal Integrity
+ // =========================================================================
+
+test("§Q1 T1 adjacent shot intervals do not overlap", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].start = p.shots[0].start + p.shots[0].duration;
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_SHOT_OVERLAP));
+});
+
+test("§Q2 T1 gaps between shots are allowed", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].start = 5;
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_SHOT_OVERLAP));
+});
+
+test("§Q3 T1 reports overlap with path and interval context", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].duration = 4;
+  p.shots[1].start = 3;
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.TEMP_SHOT_OVERLAP);
+  assert.ok(e);
+  assert.deepEqual({path:e.path,entityId:e.entityId,context:e.context},{
+    path:"/shots/1/start",entityId:"shot_002",
+    context:{firstShotId:"shot_001",secondShotId:"shot_002",firstShotIndex:0,secondShotIndex:1,overlapStart:3,overlapEnd:4}
+  });
+});
+
+test("§Q4 T1 reports each overlapping pair", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const base = structuredClone(p.shots[0]);
+  p.shots = [
+    {...base,id:"shot_a",start:0,duration:5},
+    {...base,id:"shot_b",start:1,duration:5},
+    {...base,id:"shot_c",start:2,duration:5}
+  ];
+  assert.equal(validateProject(p).errors.filter(e=>e.code===ISSUE_CODES.TEMP_SHOT_OVERLAP).length,3);
+});
+
+test("§Q5 T2 graphic ending exactly at shot end passes", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].graphics[0].start = 2.3;
+  p.shots[0].graphics[0].duration = 1.2;
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_GRAPHIC_OUTSIDE_SHOT));
+});
+
+test("§Q6 T2 reports graphic extending beyond shot end", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].graphics[0].start = 3;
+  p.shots[0].graphics[0].duration = 1;
+  const e = validateProject(p).errors.find(x=>x.code===ISSUE_CODES.TEMP_GRAPHIC_OUTSIDE_SHOT);
+  assert.ok(e);
+  assert.deepEqual({path:e.path,entityId:e.entityId,context:e.context},{
+    path:"/shots/0/graphics/0",entityId:"title_001",
+    context:{shotId:"shot_001",graphicId:"title_001",shotEnd:3.5,graphicEnd:4}
+  });
+});
+
+test("§Q7 T2 uses absolute timeline start values", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[1].graphics = [{id:"title_002",type:"text",text:"Later",start:3.5,duration:4}];
+  assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_GRAPHIC_OUTSIDE_SHOT));
+});
+
+test("§Q8 T1/T2 skip schema-invalid projects and never mutate input", () => {
+  const bad = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  bad.project.fps = 0;
+  const r = validateProject(bad);
+  assert.equal(r.meta.referenceSkipped,true);
+  assert.ok(!codesOf(r).includes(ISSUE_CODES.TEMP_SHOT_OVERLAP));
+  assert.ok(!codesOf(r).includes(ISSUE_CODES.TEMP_GRAPHIC_OUTSIDE_SHOT));
+  const good = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const snapshot = structuredClone(good);
+  validateProject(good);
+  assert.deepEqual(good,snapshot);
+});
