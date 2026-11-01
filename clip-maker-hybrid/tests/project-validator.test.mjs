@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 + DS-03A + DS-03B + DS-04 tests. Run via `node --test tests/`.
+// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 56 tests
+// Total: 66 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -14,6 +14,7 @@
 //   §I  DS-03A R7 Scene Layer Asset References (12)
 //   §J  DS-03B R11 Camera Target Actor References (10)
 //   §K  DS-04 R12 Camera Focus Target Actor References (11)
+//   §L  DS-05 R13 Character Rig Asset References (10)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -775,4 +776,116 @@ test("§H4 Object.create(null) is accepted as plain-object input", () => {
   // Should be a full validation result.
   assert.ok(Array.isArray(result.errors));
   assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+// =========================================================================
+// §L  DS-05 R13 Character Rig Asset References
+// =========================================================================
+
+test("§L1 R13 valid character rig asset resolves in assets.rigs", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING));
+});
+
+test("§L2 R13 missing rig asset reports a reference error", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-character-rig-asset.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, false);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING));
+});
+
+test("§L3 R13 validates rigs independently for multiple characters", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const source = structuredClone(project.assets.characters.char_hero);
+  source.id = "char_second";
+  source.name = "Second";
+  source.rig = { type: "humanoid", assetId: "rig_humanoid_basic" };
+  project.assets.characters.char_second = source;
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§L4 R13 reports every character with a missing rig asset", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const source = structuredClone(project.assets.characters.char_hero);
+  source.id = "char_second";
+  source.name = "Second";
+  source.rig = { type: "quadruped_simplified", assetId: "rig_missing_second" };
+  project.assets.characters.char_second = source;
+  project.assets.characters.char_hero.rig.assetId = "rig_missing_first";
+  const result = validateProject(project);
+  const errors = result.errors.filter(
+    (e) => e.code === ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING
+  );
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map((e) => e.entityId).sort(), ["char_hero", "char_second"]);
+});
+
+test("§L5 R13 rig type none skips asset reference validation", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.assets.characters.char_hero.rig = {
+    type: "none",
+    assetId: "rig_not_required"
+  };
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING));
+});
+
+test("§L6 R13 characters without rig pass", () => {
+  const project = loadJson(join(VALID_DIR, "legacy-imported.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§L7 R13 missing optional rigs registry is treated as missing reference", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  delete project.assets.rigs;
+  const result = validateProject(project);
+  assert.equal(result.valid, false);
+  assert.equal(
+    result.errors.filter((e) => e.code === ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING).length,
+    1
+  );
+});
+
+test("§L8 R13 reports canonical path, code, entityId, and context", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-character-rig-asset.json"));
+  const result = validateProject(project);
+  const error = result.errors.find(
+    (e) => e.code === ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING
+  );
+  assert.ok(error);
+  assert.equal(error.severity, "error");
+  assert.equal(error.path, "/assets/characters/char_hero/rig/assetId");
+  assert.equal(error.entityId, "char_hero");
+  assert.deepEqual(error.context, {
+    characterId: "char_hero",
+    rigType: "humanoid",
+    assetId: "rig_missing"
+  });
+});
+
+test("§L9 R13 schema-invalid projects skip reference validation", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.project.fps = 0;
+  project.assets.characters.char_hero.rig.assetId = "rig_missing";
+  const result = validateProject(project);
+  assert.equal(result.meta.referenceSkipped, true);
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING));
+});
+
+test("§L10 R13 validation does not mutate valid or invalid projects", () => {
+  const validProject = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const validSnapshot = structuredClone(validProject);
+  validateProject(validProject);
+  assert.deepEqual(validProject, validSnapshot);
+
+  const invalidProject = loadJson(join(REF_INVALID_DIR, "missing-character-rig-asset.json"));
+  const invalidSnapshot = structuredClone(invalidProject);
+  const result = validateProject(invalidProject);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING));
+  assert.deepEqual(invalidProject, invalidSnapshot);
 });
