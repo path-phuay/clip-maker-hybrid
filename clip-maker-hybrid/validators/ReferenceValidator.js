@@ -146,6 +146,38 @@ function checkSceneLayerAssetReferences(project, out) {
 
 
 /**
+ * R19 — A graphic assetId, when supplied, must resolve in assets.graphics.
+ * Graphics without assetId do not require an external asset.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkGraphicAssetReferences(project, out) {
+  const graphics = project.assets?.graphics ?? {};
+
+  (project.shots ?? []).forEach((shot, shotIndex) => {
+    (shot.graphics ?? []).forEach((graphic, graphicIndex) => {
+      if (typeof graphic.assetId !== "string") return;
+      if (Object.prototype.hasOwnProperty.call(graphics, graphic.assetId)) return;
+
+      out.push(makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.REF_GRAPHIC_ASSET_MISSING,
+        message: `Graphic "${graphic.id}" references assetId "${graphic.assetId}" which does not exist in assets.graphics.`,
+        path: pointer(["shots", String(shotIndex), "graphics", String(graphicIndex), "assetId"]),
+        entityId: graphic.id,
+        context: {
+          shotId: shot.id,
+          graphicId: graphic.id,
+          assetId: graphic.assetId
+        }
+      }));
+    });
+  });
+}
+
+
+/**
  * R14 — Every asset entry in vector, props, graphics, and rigs registries
  * must declare an id equal to its containing map key.
  *
@@ -743,6 +775,7 @@ export function validateReferences(project) {
   checkCameraTargetActorReferences(project, out); // R11
   checkCameraFocusTargetActorReferences(project, out); // R12
   checkTimelineAudioAssetReferences(project, out); // R15 + R16
+  checkGraphicAssetReferences(project, out); // R19
   checkDuplicateEntityIds(project, out); // R18
   checkShotOverlaps(project, out); // T1
   checkGraphicStartBounds(project, out); // T4
