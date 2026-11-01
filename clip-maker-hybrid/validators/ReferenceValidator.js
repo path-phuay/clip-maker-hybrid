@@ -16,6 +16,7 @@ import {
   makeIssue,
   escapeJsonPointerToken,
 } from "./issues.js";
+import { validateComposition } from "./CompositionValidator.js";
 
 /**
  * Build a JSON Pointer path for an Issue. Dynamic tokens are escaped.
@@ -724,46 +725,6 @@ function checkTransitionDurationSemantics(project, out) {
 
 
 /**
- * C1 — Consecutive chronological shots must not repeat the same shotType.
- * Array order is not assumed to be timeline order.
- *
- * @param {Object} project
- * @param {import("./issues.js").Issue[]} out
- */
-function checkConsecutiveCameraShotTypeVariety(project, out) {
-  const ordered = (project.shots ?? [])
-    .map((shot, index) => ({ shot, index }))
-    .sort((a, b) =>
-      a.shot.start - b.shot.start ||
-      (a.shot.start + a.shot.duration) - (b.shot.start + b.shot.duration) ||
-      a.index - b.index
-    );
-
-  for (let index = 1; index < ordered.length; index += 1) {
-    const previous = ordered[index - 1];
-    const current = ordered[index];
-    const previousType = previous.shot.camera.shotType;
-    const currentType = current.shot.camera.shotType;
-    if (previousType !== currentType) continue;
-
-    out.push(makeIssue({
-      severity: "error",
-      code: ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT,
-      message: `Shot "${current.shot.id}" repeats camera shot type "${currentType}" from the preceding chronological shot.`,
-      path: pointer(["shots", String(current.index), "camera", "shotType"]),
-      entityId: current.shot.id,
-      context: {
-        previousShotId: previous.shot.id,
-        currentShotId: current.shot.id,
-        shotType: currentType,
-        previousShotIndex: previous.index,
-        currentShotIndex: current.index
-      }
-    }));
-  }
-}
-
-/**
  * Run all approved reference and temporal rules against a schema-valid project.
  * Never mutates input.
  *
@@ -789,6 +750,6 @@ export function validateReferences(project) {
   checkShotProjectDurationBounds(project, out); // T3
   checkTimelineTrackProjectDurationBounds(project, out); // T5
   checkTransitionDurationSemantics(project, out); // T6 + T7
-  checkConsecutiveCameraShotTypeVariety(project, out); // C1
+  out.push(...validateComposition(project).errors); // DS-09D4 Composition Layer
   return { errors: out };
 }
