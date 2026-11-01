@@ -431,22 +431,18 @@ function checkCameraFocusTargetActorReferences(project, out) {
 }
 
 /**
- * R18 — IDs must be unique within scenes[] and shots[] independently.
- * The first occurrence is canonical; each later occurrence emits one issue
- * at the duplicate entry's id path.
+ * R18 — IDs must be unique within each declared entity collection.
+ * The first occurrence is canonical; each later sibling duplicate emits
+ * one issue at the duplicate entry's id path. Nested collections are checked
+ * independently for each parent entity.
  *
  * @param {Object} project
  * @param {import("./issues.js").Issue[]} out
  */
 function checkDuplicateEntityIds(project, out) {
-  const collections = [
-    { name: "scenes", entries: project.scenes ?? [] },
-    { name: "shots", entries: project.shots ?? [] },
-  ];
-
-  for (const collection of collections) {
+  const checkCollection = (entries, pathSegments, collection, parentContext = {}) => {
     const firstIndexById = new Map();
-    collection.entries.forEach((entry, index) => {
+    entries.forEach((entry, index) => {
       if (!entry || typeof entry !== "object" || typeof entry.id !== "string") return;
       if (!firstIndexById.has(entry.id)) {
         firstIndexById.set(entry.id, index);
@@ -458,19 +454,65 @@ function checkDuplicateEntityIds(project, out) {
         makeIssue({
           severity: "error",
           code: ISSUE_CODES.REF_DUPLICATE_ENTITY_ID,
-          message: `Duplicate id "${entry.id}" in ${collection.name}[]; first declared at index ${firstIndex}.`,
-          path: pointer([collection.name, String(index), "id"]),
+          message: `Duplicate id "${entry.id}" in ${collection}; first declared at index ${firstIndex}.`,
+          path: pointer([...pathSegments, String(index), "id"]),
           entityId: entry.id,
           context: {
-            collection: collection.name,
+            collection,
             id: entry.id,
             firstIndex,
             duplicateIndex: index,
+            ...parentContext,
           },
         })
       );
     });
-  }
+  };
+
+  // Top-level collections: each array is one independent ID namespace.
+  checkCollection(project.scenes ?? [], ["scenes"], "scenes");
+  checkCollection(project.shots ?? [], ["shots"], "shots");
+
+  // Nested collections: uniqueness is scoped to siblings under one parent.
+  (project.scenes ?? []).forEach((scene, sceneIndex) => {
+    checkCollection(
+      scene.layers ?? [],
+      ["scenes", String(sceneIndex), "layers"],
+      "scenes[].layers",
+      { sceneId: scene.id, sceneIndex }
+    );
+  });
+
+  (project.shots ?? []).forEach((shot, shotIndex) => {
+    checkCollection(
+      shot.graphics ?? [],
+      ["shots", String(shotIndex), "graphics"],
+      "shots[].graphics",
+      { shotId: shot.id, shotIndex }
+    );
+    checkCollection(
+      shot.effects ?? [],
+      ["shots", String(shotIndex), "effects"],
+      "shots[].effects",
+      { shotId: shot.id, shotIndex }
+    );
+  });
+
+  checkCollection(
+    project.timeline.audioTracks ?? [],
+    ["timeline", "audioTracks"],
+    "timeline.audioTracks"
+  );
+  checkCollection(
+    project.timeline.musicTracks ?? [],
+    ["timeline", "musicTracks"],
+    "timeline.musicTracks"
+  );
+  checkCollection(
+    project.timeline.subtitleTracks ?? [],
+    ["timeline", "subtitleTracks"],
+    "timeline.subtitleTracks"
+  );
 }
 
 
