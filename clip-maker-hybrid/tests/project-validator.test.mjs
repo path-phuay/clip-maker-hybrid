@@ -1944,3 +1944,136 @@ test("§W7 R19 skips schema-invalid projects and does not mutate input", () => {
   validateProject(valid);
   assert.deepEqual(valid, validSnapshot);
 });
+
+
+// =========================================================================
+// §X  DS-09E2 R20 Type-driven Effect Asset References
+// =========================================================================
+
+test("§X1 R20 accepts all contracted no-asset Effect Types without assetId", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [
+    "color_adjustment", "blur", "drop_shadow",
+    "glow", "vignette", "film_grain"
+  ].map((type, index) => ({ id: `effect_${index}`, type }));
+  const errors = validateProject(p).errors.filter(e =>
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_REQUIRED ||
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_MISSING
+  );
+  assert.equal(errors.length, 0);
+});
+
+test("§X2 R20 requires assetId for texture_overlay with canonical issue fields", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [{ id: "texture_001", type: "texture_overlay" }];
+  const e = validateProject(p).errors.find(x =>
+    x.code === ISSUE_CODES.REF_EFFECT_ASSET_REQUIRED
+  );
+  assert.ok(e);
+  assert.equal(e.severity, "error");
+  assert.equal(e.path, "/shots/0/effects/0/assetId");
+  assert.equal(e.entityId, "texture_001");
+  assert.deepEqual(e.context, {
+    shotId: p.shots[0].id,
+    effectId: "texture_001",
+    effectType: "texture_overlay",
+    registry: "graphics"
+  });
+});
+
+test("§X3 R20 accepts texture_overlay when assetId resolves in assets.graphics", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.assets.graphics = {
+    texture_001: { id: "texture_001", kind: "svg", uri: "assets/texture.svg" }
+  };
+  p.shots[0].effects = [{
+    id: "effect_texture",
+    type: "texture_overlay",
+    assetId: "texture_001"
+  }];
+  const errors = validateProject(p).errors.filter(e =>
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_REQUIRED ||
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_MISSING
+  );
+  assert.equal(errors.length, 0);
+});
+
+test("§X4 R20 rejects texture_overlay assets found only in another registry", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.assets.vector.vector_texture = {
+    id: "vector_texture", kind: "svg", uri: "assets/texture.svg"
+  };
+  p.shots[0].effects = [{
+    id: "effect_texture",
+    type: "texture_overlay",
+    assetId: "vector_texture"
+  }];
+  const e = validateProject(p).errors.find(x =>
+    x.code === ISSUE_CODES.REF_EFFECT_ASSET_MISSING
+  );
+  assert.ok(e);
+  assert.equal(e.path, "/shots/0/effects/0/assetId");
+  assert.equal(e.entityId, "effect_texture");
+  assert.deepEqual(e.context, {
+    shotId: p.shots[0].id,
+    effectId: "effect_texture",
+    effectType: "texture_overlay",
+    assetId: "vector_texture",
+    registry: "graphics"
+  });
+});
+
+test("§X5 R20 ignores Effect Types not listed in the approved contract", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [{
+    id: "future_effect",
+    type: "future_custom_effect",
+    assetId: "not_registered"
+  }];
+  const errors = validateProject(p).errors.filter(e =>
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_REQUIRED ||
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_MISSING
+  );
+  assert.equal(errors.length, 0);
+});
+
+test("§X6 R20 reports every unresolved contracted Effect asset reference", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [
+    { id: "effect_a", type: "texture_overlay", assetId: "missing_a" },
+    { id: "effect_b", type: "texture_overlay", assetId: "missing_b" }
+  ];
+  const errors = validateProject(p).errors.filter(e =>
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_MISSING
+  );
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(e => e.context.assetId), ["missing_a", "missing_b"]);
+});
+
+test("§X7 R20 skips schema-invalid projects and never mutates input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.shots[0].effects = [{
+    id: "effect_texture",
+    type: "texture_overlay",
+    assetId: "missing_texture"
+  }];
+  const invalidSnapshot = structuredClone(invalid);
+  const invalidResult = validateProject(invalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!invalidResult.errors.some(e =>
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_REQUIRED ||
+    e.code === ISSUE_CODES.REF_EFFECT_ASSET_MISSING
+  ));
+  assert.deepEqual(invalid, invalidSnapshot);
+
+  const valid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  valid.shots[0].effects = [{
+    id: "effect_texture",
+    type: "texture_overlay",
+    assetId: "missing_texture"
+  }];
+  const validSnapshot = structuredClone(valid);
+  validateProject(valid);
+  assert.deepEqual(valid, validSnapshot);
+});
