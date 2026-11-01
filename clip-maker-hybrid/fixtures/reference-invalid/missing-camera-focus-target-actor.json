@@ -67,7 +67,6 @@
       "camera": {
         "shotType": "medium",
         "angle": "eye_level",
-        "targetId": "char_missing_target",
         "focus": {
           "targetId": "char_missing_focus_target"
         }
