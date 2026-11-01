@@ -1,5 +1,5 @@
 // tests/project-validator.test.mjs
-// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 tests. Run via `node --test tests/`.
+// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
 // Total: 66 tests
@@ -887,5 +887,105 @@ test("§L10 R13 validation does not mutate valid or invalid projects", () => {
   const invalidSnapshot = structuredClone(invalidProject);
   const result = validateProject(invalidProject);
   assert.ok(codesOf(result).includes(ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING));
+  assert.deepEqual(invalidProject, invalidSnapshot);
+});
+
+
+// =========================================================================
+// §M  DS-06 R14 Asset Registry Map Key Integrity
+// =========================================================================
+
+test("§M1 R14 matching vector map key and id passes", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+});
+
+test("§M2 R14 mismatched vector map key and id reports an error", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "asset-registry-map-key-mismatch.json"));
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].context.registry, "vector");
+});
+
+test("§M3 R14 detects mismatched props registry entry", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.assets.props = { prop_one: { id: "prop_other", kind: "svg", uri: "props/one.svg" } };
+  const result = validateProject(project);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+  assert.equal(result.errors.find(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH).context.registry, "props");
+});
+
+test("§M4 R14 detects mismatched graphics registry entry", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.assets.graphics = { graphic_one: { id: "graphic_other", kind: "svg", uri: "graphics/one.svg" } };
+  const result = validateProject(project);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+  assert.equal(result.errors.find(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH).context.registry, "graphics");
+});
+
+test("§M5 R14 detects mismatched rigs registry entry", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.assets.rigs.rig_humanoid_basic.id = "rig_other";
+  const result = validateProject(project);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+  assert.equal(result.errors.find(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH).context.registry, "rigs");
+});
+
+test("§M6 R14 reports every mismatch across multiple registries", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.assets.vector.asset_hero_front.id = "wrong_vector";
+  project.assets.props = { prop_one: { id: "wrong_prop", kind: "svg", uri: "props/one.svg" } };
+  project.assets.graphics = { graphic_one: { id: "wrong_graphic", kind: "svg", uri: "graphics/one.svg" } };
+  project.assets.rigs.rig_humanoid_basic.id = "wrong_rig";
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH);
+  assert.equal(errors.length, 4);
+  assert.deepEqual(errors.map(e => e.context.registry), ["vector", "props", "graphics", "rigs"]);
+});
+
+test("§M7 R14 absent optional registries pass", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+});
+
+test("§M8 R14 reports canonical path, code, entityId, and context", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "asset-registry-map-key-mismatch.json"));
+  const result = validateProject(project);
+  const error = result.errors.find(e => e.code === ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH);
+  assert.ok(error);
+  assert.equal(error.severity, "error");
+  assert.equal(error.path, "/assets/vector/asset_hero_front/id");
+  assert.equal(error.entityId, "asset_hero_front");
+  assert.deepEqual(error.context, {
+    registry: "vector",
+    mapKey: "asset_hero_front",
+    declaredId: "asset_wrong_id"
+  });
+});
+
+test("§M9 R14 schema-invalid projects skip reference validation", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.project.fps = 0;
+  project.assets.vector.asset_hero_front.id = "asset_wrong_id";
+  const result = validateProject(project);
+  assert.equal(result.meta.referenceSkipped, true);
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+});
+
+test("§M10 R14 validation does not mutate valid or invalid projects", () => {
+  const validProject = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const validSnapshot = structuredClone(validProject);
+  validateProject(validProject);
+  assert.deepEqual(validProject, validSnapshot);
+
+  const invalidProject = loadJson(join(REF_INVALID_DIR, "asset-registry-map-key-mismatch.json"));
+  const invalidSnapshot = structuredClone(invalidProject);
+  const result = validateProject(invalidProject);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
   assert.deepEqual(invalidProject, invalidSnapshot);
 });
