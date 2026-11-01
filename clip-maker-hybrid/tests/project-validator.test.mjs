@@ -1863,3 +1863,84 @@ test("§V7 C1 does not report projects with fewer than two shots", () => {
   const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.COMP_CAMERA_VARIETY_CONSECUTIVE_REPEAT);
   assert.equal(errors.length, 0);
 });
+
+
+// =========================================================================
+// §W  DS-09E1 R19 Graphic Asset References
+// =========================================================================
+
+test("§W1 R19 accepts a graphic whose assetId resolves in assets.graphics", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.assets.graphics ??= {};
+  p.assets.graphics.badge_001 = { id: "badge_001", kind: "svg", uri: "assets/badge.svg" };
+  p.shots[0].graphics[0].assetId = "badge_001";
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_GRAPHIC_ASSET_MISSING);
+  assert.equal(errors.length, 0);
+});
+
+test("§W2 R19 reports a missing graphic asset with canonical issue fields", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].graphics[0].assetId = "missing_badge";
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.REF_GRAPHIC_ASSET_MISSING);
+  assert.ok(e);
+  assert.equal(e.severity, "error");
+  assert.equal(e.path, "/shots/0/graphics/0/assetId");
+  assert.equal(e.entityId, p.shots[0].graphics[0].id);
+  assert.deepEqual(e.context, {
+    shotId: p.shots[0].id,
+    graphicId: p.shots[0].graphics[0].id,
+    assetId: "missing_badge"
+  });
+});
+
+test("§W3 R19 ignores graphics without an optional assetId", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_GRAPHIC_ASSET_MISSING);
+  assert.equal(errors.length, 0);
+});
+
+test("§W4 R19 resolves only against assets.graphics, not other asset registries", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.assets.vector.vector_only = { id: "vector_only", kind: "svg", uri: "assets/vector.svg" };
+  p.assets.props ??= {};
+  p.assets.props.prop_only = { id: "prop_only", kind: "svg", uri: "assets/prop.svg" };
+  p.shots[0].graphics[0].assetId = "vector_only";
+  p.shots[1].graphics = [{ id: "graphic_002", type: "icon", start: 4, duration: 1, assetId: "prop_only" }];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_GRAPHIC_ASSET_MISSING);
+  assert.deepEqual(errors.map(e => e.context.assetId), ["vector_only", "prop_only"]);
+});
+
+test("§W5 R19 reports every unresolved graphic asset reference", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].graphics[0].assetId = "missing_one";
+  p.shots[1].graphics = [{ id: "graphic_002", type: "icon", start: 4, duration: 1, assetId: "missing_two" }];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_GRAPHIC_ASSET_MISSING);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(e => e.context.assetId), ["missing_one", "missing_two"]);
+});
+
+test("§W6 R19 treats an absent optional graphics registry as missing when referenced", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  delete p.assets.graphics;
+  p.shots[0].graphics[0].assetId = "not_registered";
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_GRAPHIC_ASSET_MISSING);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].context.assetId, "not_registered");
+});
+
+test("§W7 R19 skips schema-invalid projects and does not mutate input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.shots[0].graphics[0].assetId = "missing_asset";
+  const invalidSnapshot = structuredClone(invalid);
+  const result = validateProject(invalid);
+  assert.equal(result.meta.referenceSkipped, true);
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_GRAPHIC_ASSET_MISSING));
+  assert.deepEqual(invalid, invalidSnapshot);
+
+  const valid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  valid.shots[0].graphics[0].assetId = "missing_asset";
+  const validSnapshot = structuredClone(valid);
+  validateProject(valid);
+  assert.deepEqual(valid, validSnapshot);
+});
