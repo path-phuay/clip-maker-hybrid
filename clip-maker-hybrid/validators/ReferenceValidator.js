@@ -1,7 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14.
+//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -171,6 +171,42 @@ function checkAssetRegistryMapKeyIntegrity(project, out) {
         })
       );
     }
+  }
+}
+
+
+/**
+ * R15/R16 — Audio and music track assetIds must resolve in assets.audio.
+ * Each unresolved track is reported independently with its timeline path.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkTimelineAudioAssetReferences(project, out) {
+  const audioAssets = project.assets?.audio ?? {};
+  const trackGroups = [
+    { registry: "audioTracks", tracks: project.timeline.audioTracks, code: ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING, label: "Audio" },
+    { registry: "musicTracks", tracks: project.timeline.musicTracks, code: ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING, label: "Music" },
+  ];
+
+  for (const group of trackGroups) {
+    group.tracks.forEach((track, trackIndex) => {
+      const assetId = track.assetId;
+      if (Object.prototype.hasOwnProperty.call(audioAssets, assetId)) return;
+
+      out.push(
+        makeIssue({
+          severity: "error",
+          code: group.code,
+          message:
+            `${group.label} track "${track.id}" references assetId "${assetId}" ` +
+            "which does not exist in assets.audio.",
+          path: pointer(["timeline", group.registry, String(trackIndex), "assetId"]),
+          entityId: assetId,
+          context: { trackId: track.id, assetId, trackIndex },
+        })
+      );
+    });
   }
 }
 
@@ -411,5 +447,6 @@ export function validateReferences(project) {
   checkShotActorReferences(project, out);      // R9 + R10
   checkCameraTargetActorReferences(project, out); // R11
   checkCameraFocusTargetActorReferences(project, out); // R12
+  checkTimelineAudioAssetReferences(project, out); // R15 + R16
   return { errors: out };
 }
