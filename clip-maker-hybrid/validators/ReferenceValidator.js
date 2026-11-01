@@ -1,7 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10, R11.
+//   R1, R5, R7, R8, R9, R10, R11, R12.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
