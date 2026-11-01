@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 tests. Run via `node --test tests/`.
+// DS-02 + DS-03A + DS-03B + DS-04 + DS-05 + DS-06 + DS-07 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 76 tests
+// Total: 86 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -16,6 +16,7 @@
 //   §K  DS-04 R12 Camera Focus Target Actor References (11)
 //   §L  DS-05 R13 Character Rig Asset References (10)
 //   §M  DS-06 R14 Asset Registry Map Key Integrity (10)
+//   §N  DS-07 R15/R16 Audio and Music Asset References (10)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -988,5 +989,108 @@ test("§M10 R14 validation does not mutate valid or invalid projects", () => {
   const invalidSnapshot = structuredClone(invalidProject);
   const result = validateProject(invalidProject);
   assert.ok(codesOf(result).includes(ISSUE_CODES.REF_ASSET_MAP_KEY_MISMATCH));
+  assert.deepEqual(invalidProject, invalidSnapshot);
+});
+
+
+// =========================================================================
+// §N  DS-07 R15/R16 Audio and Music Asset References
+// =========================================================================
+
+test("§N1 R15 audio track resolves an asset in assets.audio", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.assets.audio = { voice_001: { id: "voice_001", uri: "audio/voice.wav" } };
+  const result = validateProject(project);
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING));
+});
+
+test("§N2 R15 reports an audio track with a missing asset", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const result = validateProject(project);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING));
+});
+
+test("§N3 R16 music track resolves an asset in assets.audio", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.timeline.musicTracks.push({ id: "music_track_1", assetId: "music_001", start: 0 });
+  project.assets.audio = { music_001: { id: "music_001", uri: "audio/music.mp3" } };
+  const result = validateProject(project);
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING));
+});
+
+test("§N4 R16 reports a music track with a missing asset", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.timeline.musicTracks.push({ id: "music_track_1", assetId: "music_missing", start: 0 });
+  const result = validateProject(project);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING));
+});
+
+test("§N5 R15 reports every unresolved audio track", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.timeline.audioTracks.push(
+    { id: "voice_a", assetId: "missing_a", start: 0 },
+    { id: "voice_b", assetId: "missing_b", start: 1 }
+  );
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING);
+  assert.equal(errors.length, 2);
+});
+
+test("§N6 R16 reports every unresolved music track", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.timeline.musicTracks.push(
+    { id: "music_a", assetId: "missing_a", start: 0 },
+    { id: "music_b", assetId: "missing_b", start: 1 }
+  );
+  const result = validateProject(project);
+  const errors = result.errors.filter(e => e.code === ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING);
+  assert.equal(errors.length, 2);
+});
+
+test("§N7 R15/R16 report canonical paths and issue context", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.timeline.audioTracks.push({ id: "voice_x", assetId: "voice_missing", start: 0 });
+  project.timeline.musicTracks.push({ id: "music_x", assetId: "music_missing", start: 0 });
+  const result = validateProject(project);
+  const audio = result.errors.find(e => e.code === ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING);
+  const music = result.errors.find(e => e.code === ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING);
+  assert.deepEqual(
+    { severity: audio.severity, path: audio.path, entityId: audio.entityId, context: audio.context },
+    { severity: "error", path: "/timeline/audioTracks/0/assetId", entityId: "voice_missing", context: { trackId: "voice_x", assetId: "voice_missing", trackIndex: 0 } }
+  );
+  assert.deepEqual(
+    { severity: music.severity, path: music.path, entityId: music.entityId, context: music.context },
+    { severity: "error", path: "/timeline/musicTracks/0/assetId", entityId: "music_missing", context: { trackId: "music_x", assetId: "music_missing", trackIndex: 0 } }
+  );
+});
+
+test("§N8 absent optional audio registry reports referenced assets as missing", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const result = validateProject(project);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING));
+});
+
+test("§N9 schema-invalid projects skip R15/R16 reference validation", () => {
+  const project = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  project.project.fps = 0;
+  const result = validateProject(project);
+  assert.equal(result.meta.referenceSkipped, true);
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_AUDIO_TRACK_ASSET_MISSING));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING));
+});
+
+test("§N10 R15/R16 validation does not mutate valid or invalid projects", () => {
+  const validProject = loadJson(join(VALID_DIR, "minimal-project.json"));
+  validProject.assets.audio = { sound_001: { id: "sound_001", uri: "audio/sound.wav" } };
+  validProject.timeline.audioTracks.push({ id: "audio_ok", assetId: "sound_001", start: 0 });
+  const validSnapshot = structuredClone(validProject);
+  validateProject(validProject);
+  assert.deepEqual(validProject, validSnapshot);
+
+  const invalidProject = loadJson(join(VALID_DIR, "minimal-project.json"));
+  invalidProject.timeline.musicTracks.push({ id: "music_bad", assetId: "missing_music", start: 0 });
+  const invalidSnapshot = structuredClone(invalidProject);
+  const result = validateProject(invalidProject);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_MUSIC_TRACK_ASSET_MISSING));
   assert.deepEqual(invalidProject, invalidSnapshot);
 });
