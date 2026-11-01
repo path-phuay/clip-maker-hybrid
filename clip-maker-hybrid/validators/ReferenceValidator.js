@@ -292,6 +292,42 @@ function checkShotActorReferences(project, out) {
 }
 
 /**
+ * R12 — A camera focus targetId must match the characterId of at least one
+ * actor in the same shot. One matching actor instance is sufficient.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkCameraFocusTargetActorReferences(project, out) {
+  const shots = project.shots ?? [];
+
+  shots.forEach((shot, shotIndex) => {
+    if (!shot || typeof shot !== "object") return;
+    const targetId = shot.camera?.focus?.targetId;
+    if (typeof targetId !== "string") return;
+
+    const actors = Array.isArray(shot.actors) ? shot.actors : [];
+    const hasTargetActor = actors.some(
+      (actor) => actor && typeof actor === "object" &&
+        actor.characterId === targetId
+    );
+    if (hasTargetActor) return;
+
+    out.push(
+      makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING,
+        message:
+          `Camera focus targetId "${targetId}" does not match any actor characterId in this shot.`,
+        path: pointer(["shots", String(shotIndex), "camera", "focus", "targetId"]),
+        entityId: targetId,
+        context: { shotId: shot.id, targetId },
+      })
+    );
+  });
+}
+
+/**
  * Run all approved reference rules against a schema-valid project.
  * Never mutates input.
  *
@@ -306,5 +342,6 @@ export function validateReferences(project) {
   checkShotSceneReferences(project, out);      // R8
   checkShotActorReferences(project, out);      // R9 + R10
   checkCameraTargetActorReferences(project, out); // R11
+  checkCameraFocusTargetActorReferences(project, out); // R12
   return { errors: out };
 }
