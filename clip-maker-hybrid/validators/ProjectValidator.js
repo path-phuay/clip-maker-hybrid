@@ -6,7 +6,7 @@
 //      documented input contract below)
 //   2. Layer A — schema validation
 //      • If fails → skip Layer B entirely (per Owner Q1=A)
-//   3. Layer B — reference and temporal validation (R1,R5,R7-R18,T1,T2,T3,T4 (including nested collection duplicate IDs))
+//   3. Layer B — reference and temporal validation (R1,R5,R7-R18,T1,T2,T3,T4,T5 (including nested collection duplicate IDs))
 //
 // INPUT CONTRACT (narrowed per Architecture Owner DS-02 Round 2.3 review):
 //
