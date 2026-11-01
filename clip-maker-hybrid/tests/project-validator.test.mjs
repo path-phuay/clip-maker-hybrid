@@ -26,7 +26,7 @@
 //   §U  DS-09C4 T6/T7 Transition Duration Semantics (8)
 //   §V  DS-09D3 C1 Consecutive Camera Shot Type Variety (7)
 //
-// Total: 141 tests
+// Total: 148 tests
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
