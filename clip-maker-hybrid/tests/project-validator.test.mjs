@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 through DS-09C3 tests. Run via `node --test tests/`.
+// DS-02 through DS-09C4 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 133 tests
+// Total: 141 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -1669,4 +1669,100 @@ test("§T9 T5 uses absolute timeline start values", () => {
   p.timeline.subtitleTracks = [{ id: "subtitle_absolute", text: "Absolute", start: 11.5, duration: 0.5 }];
   const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
   assert.equal(errors.length, 0);
+});
+
+
+// =========================================================================
+// §U  DS-09C4 T6/T7 Transition Duration Semantics
+// =========================================================================
+
+test("§U1 T6 accepts positive-duration fade, wipe, and slide transitions", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  for (const type of ["fade", "wipe", "slide"]) {
+    p.shots[0].transitionOut = { type, duration: 0.25 };
+    const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TRANSITION_DURATION_NOT_POSITIVE);
+    assert.equal(errors.length, 0, type);
+  }
+});
+
+test("§U2 T6 rejects zero-duration non-cut transitions", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].transitionOut = { type: "fade", duration: 0 };
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.TEMP_TRANSITION_DURATION_NOT_POSITIVE);
+  assert.ok(e);
+  assert.equal(e.path, "/shots/0/transitionOut/duration");
+  assert.equal(e.entityId, p.shots[0].id);
+  assert.deepEqual(e.context, {
+    shotId: p.shots[0].id,
+    transitionType: "fade",
+    transitionDuration: 0
+  });
+});
+
+test("§U3 T6 does not flag a cut transition with zero duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].transitionOut = { type: "cut", duration: 0 };
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TRANSITION_DURATION_NOT_POSITIVE);
+  assert.equal(errors.length, 0);
+});
+
+test("§U4 T7 accepts transition duration equal to shot duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].transitionOut = { type: "fade", duration: p.shots[0].duration };
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TRANSITION_EXCEEDS_SHOT_DURATION);
+  assert.equal(errors.length, 0);
+});
+
+test("§U5 T7 rejects transition duration longer than its owning shot", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].transitionOut = { type: "wipe", duration: p.shots[0].duration + 0.5 };
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.TEMP_TRANSITION_EXCEEDS_SHOT_DURATION);
+  assert.ok(e);
+  assert.equal(e.path, "/shots/0/transitionOut/duration");
+  assert.equal(e.entityId, p.shots[0].id);
+  assert.deepEqual(e.context, {
+    shotId: p.shots[0].id,
+    transitionType: "wipe",
+    transitionDuration: p.shots[0].duration + 0.5,
+    shotDuration: p.shots[0].duration,
+    overflow: 0.5
+  });
+});
+
+test("§U6 T7 reports every transition exceeding its own shot duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].transitionOut = { type: "fade", duration: p.shots[0].duration + 0.1 };
+  p.shots[1].transitionOut = { type: "slide", duration: p.shots[1].duration + 0.2 };
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TRANSITION_EXCEEDS_SHOT_DURATION);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(e => e.entityId), [p.shots[0].id, p.shots[1].id]);
+});
+
+test("§U7 T6/T7 do not require a following shot or validate transition adjacency", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots = [p.shots[0]];
+  p.shots[0].transitionOut = { type: "fade", duration: 0.2 };
+  const errors = validateProject(p).errors.filter(e =>
+    e.code === ISSUE_CODES.TEMP_TRANSITION_DURATION_NOT_POSITIVE ||
+    e.code === ISSUE_CODES.TEMP_TRANSITION_EXCEEDS_SHOT_DURATION
+  );
+  assert.equal(errors.length, 0);
+});
+
+test("§U8 T6/T7 skip schema-invalid projects and never mutate input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.shots[0].transitionOut = { type: "fade", duration: 0 };
+  const invalidSnapshot = structuredClone(invalid);
+  const invalidResult = validateProject(invalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!codesOf(invalidResult).includes(ISSUE_CODES.TEMP_TRANSITION_DURATION_NOT_POSITIVE));
+  assert.ok(!codesOf(invalidResult).includes(ISSUE_CODES.TEMP_TRANSITION_EXCEEDS_SHOT_DURATION));
+  assert.deepEqual(invalid, invalidSnapshot);
+
+  const valid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  valid.shots[0].transitionOut = { type: "fade", duration: 0.2 };
+  const validSnapshot = structuredClone(valid);
+  validateProject(valid);
+  assert.deepEqual(valid, validSnapshot);
 });
