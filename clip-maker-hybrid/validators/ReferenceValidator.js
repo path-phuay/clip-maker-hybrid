@@ -1,7 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10, R11, R12.
+//   R1, R5, R7, R8, R9, R10, R11, R12, R13.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -149,6 +149,40 @@ function checkSceneLayerAssetReferences(project, out) {
  * @param {Object} project
  * @param {import("./issues.js").Issue[]} out
  */
+/**
+ * R13 — A character rig assetId must resolve in assets.rigs, except when
+ * rig.type is "none". Every character with a missing rig asset is reported.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkCharacterRigAssetReferences(project, out) {
+  const characters = project.assets?.characters ?? {};
+  const rigs = project.assets?.rigs ?? {};
+
+  for (const [characterId, character] of Object.entries(characters)) {
+    const rig = character?.rig;
+    if (!rig || typeof rig !== "object" || rig.type === "none") continue;
+
+    const assetId = rig.assetId;
+    if (typeof assetId !== "string") continue;
+    if (Object.prototype.hasOwnProperty.call(rigs, assetId)) continue;
+
+    out.push(
+      makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.REF_CHARACTER_RIG_ASSET_MISSING,
+        message:
+          `Character "${characterId}" references rig asset "${assetId}" ` +
+          "which does not exist in assets.rigs.",
+        path: pointer(["assets", "characters", characterId, "rig", "assetId"]),
+        entityId: characterId,
+        context: { characterId, rigType: rig.type, assetId },
+      })
+    );
+  }
+}
+
 function checkCameraTargetActorReferences(project, out) {
   const shots = project.shots ?? [];
 
@@ -338,6 +372,7 @@ export function validateReferences(project) {
   const out = [];
   checkCharacterMapKeyIntegrity(project, out); // R1
   checkCharacterViewAssets(project, out);      // R5
+  checkCharacterRigAssetReferences(project, out); // R13
   checkSceneLayerAssetReferences(project, out); // R7
   checkShotSceneReferences(project, out);      // R8
   checkShotActorReferences(project, out);      // R9 + R10
