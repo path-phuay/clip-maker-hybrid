@@ -468,6 +468,158 @@ test("§J10 R11 validation does not mutate valid or invalid projects", () => {
 });
 
 // =========================================================================
+// §K  DS-04 — R12 Camera Focus Target Actor References
+// =========================================================================
+
+test("§K1 R12 accepts a focus target matching an actor in the same shot", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.focus = { targetId: "char_hero" };
+  project.shots[0].actors = [makeActor("char_hero")];
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING));
+});
+
+test("§K2 R12 reports a focus target when no actor in the shot matches", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-camera-focus-target-actor.json"));
+  const result = validateProject(project);
+
+  assert.equal(result.valid, false);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, "/shots/0/camera/focus/targetId");
+  assert.equal(errors[0].entityId, "char_missing_focus_target");
+});
+
+test("§K3 R12 does not resolve an actor found only in another shot", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.focus = { targetId: "char_hero" };
+  project.shots.push({
+    id: "shot_002",
+    sceneId: "scene_001",
+    start: 3,
+    duration: 3,
+    camera: { shotType: "medium", angle: "eye_level" },
+    actors: [makeActor("char_hero")],
+  });
+
+  const result = validateProject(project);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, "/shots/0/camera/focus/targetId");
+});
+
+test("§K4 R12 reports a focus target when the shot has no actors", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-camera-focus-target-actor.json"));
+  const result = validateProject(project);
+  assert.ok(codesOf(result).includes(ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING));
+});
+
+test("§K5 R12 accepts a camera without focus", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING));
+});
+
+test("§K6 R12 accepts focus without targetId", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.focus = { dofBlur: 2 };
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§K7 R12 accepts one matching actor among multiple actors", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.focus = { targetId: "char_hero" };
+  project.assets.characters.char_other = {
+    ...structuredClone(project.assets.characters.char_hero),
+    id: "char_other",
+    name: "Other",
+  };
+  project.shots[0].actors = [makeActor("char_other"), makeActor("char_hero")];
+
+  const result = validateProject(project);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+});
+
+test("§K8 R12 reports only shots whose focus target is unresolved", () => {
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.shots[0].camera.focus = { targetId: "char_missing_a" };
+  project.shots.push({
+    id: "shot_002",
+    sceneId: "scene_001",
+    start: 3,
+    duration: 3,
+    camera: { shotType: "medium", angle: "eye_level", focus: { targetId: "char_hero" } },
+    actors: [makeActor("char_hero")],
+  });
+  project.shots.push({
+    id: "shot_003",
+    sceneId: "scene_001",
+    start: 6,
+    duration: 3,
+    camera: { shotType: "medium", angle: "eye_level", focus: { targetId: "char_missing_b" } },
+    actors: [],
+  });
+
+  const result = validateProject(project);
+  const errors = result.errors.filter((e) => e.code === ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING);
+  assert.deepEqual(errors.map((e) => e.path), [
+    "/shots/0/camera/focus/targetId",
+    "/shots/2/camera/focus/targetId",
+  ]);
+  assert.deepEqual(errors.map((e) => e.entityId), ["char_missing_a", "char_missing_b"]);
+});
+
+test("§K9 schema-invalid projects skip R12 reference validation", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-camera-focus-target-actor.json"));
+  project.project.resolution.width = 0;
+
+  const result = validateProject(project);
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.meta.layers, ["schema"]);
+  assert.equal(result.meta.referenceSkipped, true);
+  assert.ok(codesOf(result).every((code) => code.startsWith("SCHEMA_")));
+  assert.ok(!codesOf(result).includes(ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING));
+});
+
+test("§K10 R12 reports canonical JSON Pointer, issue code, and entityId", () => {
+  const project = loadJson(join(REF_INVALID_DIR, "missing-camera-focus-target-actor.json"));
+  const result = validateProject(project);
+  const error = result.errors.find((e) => e.code === ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING);
+
+  assert.ok(error);
+  assert.equal(error.severity, "error");
+  assert.equal(error.code, "REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING");
+  assert.equal(error.path, "/shots/0/camera/focus/targetId");
+  assert.equal(error.entityId, "char_missing_focus_target");
+  assert.deepEqual(error.context, {
+    shotId: "shot_001",
+    targetId: "char_missing_focus_target",
+  });
+});
+
+test("§K11 R12 validation does not mutate valid or invalid projects", () => {
+  const validProject = loadJson(join(VALID_DIR, "minimal-project.json"));
+  validProject.shots[0].camera.focus = { targetId: "char_hero" };
+  validProject.shots[0].actors = [makeActor("char_hero")];
+  const validSnapshot = structuredClone(validProject);
+  const validResult = validateProject(validProject);
+  assert.equal(validResult.valid, true);
+  assert.deepEqual(validProject, validSnapshot);
+
+  const invalidProject = loadJson(join(REF_INVALID_DIR, "missing-camera-focus-target-actor.json"));
+  const invalidSnapshot = structuredClone(invalidProject);
+  const invalidResult = validateProject(invalidProject);
+  assert.equal(invalidResult.valid, false);
+  assert.ok(codesOf(invalidResult).includes(ISSUE_CODES.REF_CAMERA_FOCUS_TARGET_ACTOR_MISSING));
+  assert.deepEqual(invalidProject, invalidSnapshot);
+});
+
+// =========================================================================
 // §D  Multiple errors + immutability
 // =========================================================================
 
