@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 through DS-09C2 tests. Run via `node --test tests/`.
+// DS-02 through DS-09C3 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 124 tests
+// Total: 133 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -22,7 +22,7 @@
 //   §Q  DS-09B T1/T2/T3 Temporal Integrity (13)
 //   §R  DS-09C1 Nested Collection Duplicate IDs (8)
 //
-// Total: 124 tests
+// Total: 133 tests
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -1556,4 +1556,117 @@ test("§S7 T4 does not report shots without graphics", () => {
   const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
   p.shots[1].graphics = [];
   assert.ok(!codesOf(validateProject(p)).includes(ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT));
+});
+
+
+// =========================================================================
+// §T  DS-09C3 T5 Timeline Track Project Duration Bounds
+// =========================================================================
+
+test("§T1 T5 accepts timeline tracks ending exactly at project.duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.audioTracks = [{ id: "audio_at_end", assetId: "voice_001", start: 10, duration: 2 }];
+  p.timeline.musicTracks = [{ id: "music_at_end", assetId: "voice_001", start: 10, duration: 2 }];
+  p.timeline.subtitleTracks = [{ id: "subtitle_at_end", text: "End", start: 10, duration: 2 }];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
+  assert.equal(errors.length, 0);
+});
+
+test("§T2 T5 rejects tracks whose start is after project.duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.audioTracks = [{ id: "audio_late", assetId: "voice_001", start: 12.1 }];
+  p.timeline.musicTracks = [{ id: "music_late", assetId: "voice_001", start: 12.2 }];
+  p.timeline.subtitleTracks = [{ id: "subtitle_late", text: "Late", start: 12.3, duration: 0.2 }];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
+  assert.equal(errors.length, 3);
+  assert.deepEqual(errors.map(e => e.path), [
+    "/timeline/audioTracks/0/start",
+    "/timeline/musicTracks/0/start",
+    "/timeline/subtitleTracks/0/start"
+  ]);
+});
+
+test("§T3 T5 rejects tracks whose end exceeds project.duration", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.audioTracks = [{ id: "audio_over", assetId: "voice_001", start: 11, duration: 1.1 }];
+  p.timeline.musicTracks = [{ id: "music_over", assetId: "voice_001", start: 11, duration: 1.2 }];
+  p.timeline.subtitleTracks = [{ id: "subtitle_over", text: "Over", start: 11, duration: 1.3 }];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
+  assert.equal(errors.length, 3);
+  assert.deepEqual(errors.map(e => e.path), [
+    "/timeline/audioTracks/0/duration",
+    "/timeline/musicTracks/0/duration",
+    "/timeline/subtitleTracks/0/duration"
+  ]);
+});
+
+test("§T4 T5 checks every track independently and reports all violations", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.audioTracks = [
+    { id: "audio_bad_a", assetId: "voice_001", start: 11, duration: 2 },
+    { id: "audio_bad_b", assetId: "voice_001", start: 13 }
+  ];
+  p.timeline.musicTracks = [{ id: "music_bad", assetId: "voice_001", start: 0, duration: 13 }];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
+  assert.equal(errors.length, 3);
+  assert.deepEqual(errors.map(e => e.entityId), ["audio_bad_a", "audio_bad_b", "music_bad"]);
+});
+
+test("§T5 T5 accepts audio and music tracks without optional duration when start is in range", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.audioTracks = [{ id: "audio_no_duration", assetId: "voice_001", start: 11.9 }];
+  p.timeline.musicTracks = [{ id: "music_no_duration", assetId: "voice_001", start: 12 }];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
+  assert.equal(errors.length, 0);
+});
+
+test("§T6 T5 reports canonical issue fields and overflow context", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.subtitleTracks = [{ id: "subtitle_overflow", text: "Overflow", start: 11, duration: 1.5 }];
+  const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
+  assert.ok(e);
+  assert.equal(e.severity, "error");
+  assert.equal(e.path, "/timeline/subtitleTracks/0/duration");
+  assert.equal(e.entityId, "subtitle_overflow");
+  assert.deepEqual(e.context, {
+    collection: "subtitleTracks",
+    trackId: "subtitle_overflow",
+    trackIndex: 0,
+    trackStart: 11,
+    trackEnd: 12.5,
+    projectDuration: 12,
+    overflow: 0.5
+  });
+});
+
+test("§T7 T5 allows empty timeline track collections", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.audioTracks = [];
+  p.timeline.musicTracks = [];
+  p.timeline.subtitleTracks = [];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
+  assert.equal(errors.length, 0);
+});
+
+test("§T8 T5 skips schema-invalid projects and never mutates input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.timeline.subtitleTracks[0].start = 20;
+  const invalidSnapshot = structuredClone(invalid);
+  const invalidResult = validateProject(invalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!codesOf(invalidResult).includes(ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION));
+  assert.deepEqual(invalid, invalidSnapshot);
+
+  const valid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const validSnapshot = structuredClone(valid);
+  validateProject(valid);
+  assert.deepEqual(valid, validSnapshot);
+});
+
+test("§T9 T5 uses absolute timeline start values", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.subtitleTracks = [{ id: "subtitle_absolute", text: "Absolute", start: 11.5, duration: 0.5 }];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION);
+  assert.equal(errors.length, 0);
 });
