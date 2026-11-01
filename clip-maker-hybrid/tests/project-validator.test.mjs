@@ -21,8 +21,11 @@
 //   §P  DS-09A R18 Duplicate Scene/Shot IDs (5)
 //   §Q  DS-09B T1/T2/T3 Temporal Integrity (13)
 //   §R  DS-09C1 Nested Collection Duplicate IDs (8)
+//   §S  DS-09C2 T4 Graphic Start Bounds (7)
+//   §T  DS-09C3 T5 Timeline Track Project Duration Bounds (9)
+//   §U  DS-09C4 T6/T7 Transition Duration Semantics (8)
 //
-// Total: 133 tests
+// Total: 141 tests
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
