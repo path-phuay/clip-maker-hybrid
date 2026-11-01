@@ -4,14 +4,21 @@
     "id": "project_cartoon",
     "title": "Cartoon Story",
     "fps": 30,
-    "resolution": { "width": 1080, "height": 1920 },
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
     "aspectRatio": "9:16",
     "duration": 12,
     "style": {
       "preset": "cinematic_cartoon",
       "characterStyle": "chibi",
       "environmentStyle": "stylized",
-      "palette": ["#17243D", "#E8A15A", "#D8322F"],
+      "palette": [
+        "#17243D",
+        "#E8A15A",
+        "#D8322F"
+      ],
       "lighting": "cinematic",
       "consistency": "high"
     }
@@ -25,21 +32,72 @@
         "design": {
           "description": "Chibi hero with black hair and red jacket",
           "seed": 1234,
-          "colors": { "skin": "#E0AC7C", "hair": "#1B1410", "outfit": "#D8322F" }
+          "colors": {
+            "skin": "#E0AC7C",
+            "hair": "#1B1410",
+            "outfit": "#D8322F"
+          }
         },
         "views": {
           "front": "asset_hero_front",
           "threeQuarter": "asset_hero_3q",
           "side": "asset_hero_side"
         },
-        "rig": { "type": "humanoid", "assetId": "rig_humanoid_basic" },
-        "supportedActions": ["idle", "walk", "run", "jump", "wave"]
+        "rig": {
+          "type": "humanoid",
+          "assetId": "rig_humanoid_basic"
+        },
+        "supportedActions": [
+          "idle",
+          "walk",
+          "run",
+          "jump",
+          "wave"
+        ]
       }
     },
     "vector": {
-      "asset_hero_front": { "id": "asset_hero_front", "kind": "svg", "uri": "assets/characters/hero/front.svg", "width": 512, "height": 512 },
-      "asset_hero_3q":    { "id": "asset_hero_3q",    "kind": "svg", "uri": "assets/characters/hero/3q.svg",    "width": 512, "height": 512 },
-      "asset_hero_side":  { "id": "asset_hero_side",  "kind": "svg", "uri": "assets/characters/hero/side.svg",  "width": 512, "height": 512 }
+      "asset_hero_front": {
+        "id": "asset_hero_front",
+        "kind": "svg",
+        "uri": "assets/characters/hero/front.svg",
+        "width": 512,
+        "height": 512
+      },
+      "asset_hero_3q": {
+        "id": "asset_hero_3q",
+        "kind": "svg",
+        "uri": "assets/characters/hero/3q.svg",
+        "width": 512,
+        "height": 512
+      },
+      "asset_hero_side": {
+        "id": "asset_hero_side",
+        "kind": "svg",
+        "uri": "assets/characters/hero/side.svg",
+        "width": 512,
+        "height": 512
+      },
+      "sky_night": {
+        "id": "sky_night",
+        "kind": "svg",
+        "uri": "assets/environment/sky-night.svg"
+      },
+      "city_buildings": {
+        "id": "city_buildings",
+        "kind": "svg",
+        "uri": "assets/environment/city-buildings.svg"
+      },
+      "wet_road": {
+        "id": "wet_road",
+        "kind": "svg",
+        "uri": "assets/environment/wet-road.svg"
+      },
+      "rain_foreground": {
+        "id": "rain_foreground",
+        "kind": "svg",
+        "uri": "assets/environment/rain-foreground.svg"
+      }
     }
   },
   "scenes": [
@@ -47,14 +105,48 @@
       "id": "scene_001",
       "title": "Night Street",
       "location": "urban_street",
-      "environment": { "timeOfDay": "night", "weather": "rain" },
+      "environment": {
+        "timeOfDay": "night",
+        "weather": "rain"
+      },
       "layers": [
-        { "id": "sky",        "type": "background",  "depth": 0,  "assetIds": ["sky_night"] },
-        { "id": "buildings",  "type": "environment", "depth": 10, "assetIds": ["city_buildings"] },
-        { "id": "street",     "type": "ground",      "depth": 20, "assetIds": ["wet_road"] },
-        { "id": "foreground", "type": "foreground",  "depth": 30, "assetIds": ["rain_foreground"] }
+        {
+          "id": "sky",
+          "type": "background",
+          "depth": 0,
+          "assetIds": [
+            "sky_night"
+          ]
+        },
+        {
+          "id": "buildings",
+          "type": "environment",
+          "depth": 10,
+          "assetIds": [
+            "city_buildings"
+          ]
+        },
+        {
+          "id": "street",
+          "type": "ground",
+          "depth": 20,
+          "assetIds": [
+            "wet_road"
+          ]
+        },
+        {
+          "id": "foreground",
+          "type": "foreground",
+          "depth": 30,
+          "assetIds": [
+            "rain_foreground"
+          ]
+        }
       ],
-      "lighting": { "preset": "neon_night", "ambient": 0.5 }
+      "lighting": {
+        "preset": "neon_night",
+        "ambient": 0.5
+      }
     }
   ],
   "shots": [
@@ -69,8 +161,16 @@
         "targetId": "char_hero",
         "movement": {
           "type": "dolly_in",
-          "from": { "x": 0.5, "y": 0.5, "zoom": 1 },
-          "to":   { "x": 0.5, "y": 0.55, "zoom": 1.4 },
+          "from": {
+            "x": 0.5,
+            "y": 0.5,
+            "zoom": 1
+          },
+          "to": {
+            "x": 0.5,
+            "y": 0.55,
+            "zoom": 1.4
+          },
           "easing": "ease_in_out"
         }
       },
@@ -78,7 +178,11 @@
         {
           "characterId": "char_hero",
           "view": "threeQuarter",
-          "position": { "x": 0.5, "y": 0.8, "z": 0.6 },
+          "position": {
+            "x": 0.5,
+            "y": 0.8,
+            "z": 0.6
+          },
           "facing": "right",
           "action": "walk",
           "expression": "alert"
@@ -92,23 +196,36 @@
           "start": 0.4,
           "duration": 1.2,
           "animation": "fade_up",
-          "position": { "x": 0.5, "y": 0.15 }
+          "position": {
+            "x": 0.5,
+            "y": 0.15
+          }
         }
       ],
       "effects": [],
-      "transitionOut": { "type": "cut", "duration": 0 }
+      "transitionOut": {
+        "type": "cut",
+        "duration": 0
+      }
     },
     {
       "id": "shot_002",
       "sceneId": "scene_001",
       "start": 3.5,
       "duration": 4,
-      "camera": { "shotType": "close_up", "angle": "low", "targetId": "char_hero" },
+      "camera": {
+        "shotType": "close_up",
+        "angle": "low",
+        "targetId": "char_hero"
+      },
       "actors": [
         {
           "characterId": "char_hero",
           "view": "front",
-          "position": { "x": 0.5, "y": 0.8 },
+          "position": {
+            "x": 0.5,
+            "y": 0.8
+          },
           "facing": "front",
           "action": "idle"
         }
@@ -117,12 +234,26 @@
   ],
   "timeline": {
     "audioTracks": [
-      { "id": "audio_001", "assetId": "voice_001", "start": 0.2, "duration": 2.0, "volume": 0.9 }
+      {
+        "id": "audio_001",
+        "assetId": "voice_001",
+        "start": 0.2,
+        "duration": 2,
+        "volume": 0.9
+      }
     ],
     "subtitleTracks": [
-      { "id": "sub_001", "text": "เมืองที่ไม่มีวันหลับ", "start": 0.4, "duration": 1.2, "language": "th" }
+      {
+        "id": "sub_001",
+        "text": "เมืองที่ไม่มีวันหลับ",
+        "start": 0.4,
+        "duration": 1.2,
+        "language": "th"
+      }
     ],
     "musicTracks": []
   },
-  "legacyData": { "sourceVersion": "v1" }
+  "legacyData": {
+    "sourceVersion": "v1"
+  }
 }
