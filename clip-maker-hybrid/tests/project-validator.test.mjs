@@ -1,8 +1,8 @@
 // tests/project-validator.test.mjs
-// DS-02 through DS-09B tests. Run via `node --test tests/`.
+// DS-02 through DS-09C1 tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 109 tests
+// Total: 117 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -20,6 +20,7 @@
 //   §O  DS-08 R17 Audio Asset Map Key Integrity (5)
 //   §P  DS-09A R18 Duplicate Scene/Shot IDs (5)
 //   §Q  DS-09B T1/T2/T3 Temporal Integrity (13)
+//   §R  DS-09C1 Nested Collection Duplicate IDs (8)
 //
 // Total: 109 tests
 
@@ -1378,4 +1379,100 @@ test("§Q8 T1/T2 skip schema-invalid projects and never mutate input", () => {
   const snapshot = structuredClone(good);
   validateProject(good);
   assert.deepEqual(good,snapshot);
+});
+
+
+// =========================================================================
+// §R  DS-09C1 R18 Nested Collection Duplicate IDs
+// =========================================================================
+
+test("§R1 R18 duplicate layer IDs are detected only among sibling layers", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.scenes[0].layers.push({ ...structuredClone(p.scenes[0].layers[0]) });
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, `/scenes/0/layers/${p.scenes[0].layers.length - 1}/id`);
+  assert.equal(errors[0].context.collection, "scenes[].layers");
+  assert.equal(errors[0].context.sceneId, p.scenes[0].id);
+  assert.equal(errors[0].context.firstIndex, 0);
+});
+
+test("§R2 R18 duplicate graphic IDs are detected only among graphics in the same shot", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].graphics.push({ ...structuredClone(p.shots[0].graphics[0]), start: 0, duration: 1 });
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, `/shots/0/graphics/${p.shots[0].graphics.length - 1}/id`);
+  assert.equal(errors[0].context.collection, "shots[].graphics");
+  assert.equal(errors[0].context.shotId, p.shots[0].id);
+});
+
+test("§R3 R18 duplicate effect IDs are detected among sibling effects", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.shots[0].effects = [
+    { id: "effect_duplicate", type: "blur" },
+    { id: "effect_duplicate", type: "glow" }
+  ];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, "/shots/0/effects/1/id");
+  assert.equal(errors[0].context.collection, "shots[].effects");
+});
+
+test("§R4 R18 duplicate IDs in audio, music, and subtitle tracks are detected independently", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  p.timeline.audioTracks.push({ ...structuredClone(p.timeline.audioTracks[0]), id: p.timeline.audioTracks[0].id });
+  p.timeline.musicTracks.push({ ...structuredClone(p.timeline.musicTracks[0]), id: p.timeline.musicTracks[0].id });
+  p.timeline.subtitleTracks.push({ ...structuredClone(p.timeline.subtitleTracks[0]), id: p.timeline.subtitleTracks[0].id });
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 3);
+  assert.deepEqual(errors.map(e => e.context.collection), [
+    "timeline.audioTracks", "timeline.musicTracks", "timeline.subtitleTracks"
+  ]);
+});
+
+test("§R5 R18 identical nested IDs under different parents are allowed", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const layer = structuredClone(p.scenes[0].layers[0]);
+  p.scenes.push({ ...structuredClone(p.scenes[0]), id: "scene_extra", layers: [layer] });
+  const graphic = { id: "graphic_shared", type: "text", text: "A", start: 0, duration: 1 };
+  p.shots[0].graphics = [structuredClone(graphic)];
+  p.shots[1].graphics = [structuredClone(graphic)];
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 0, JSON.stringify(errors, null, 2));
+});
+
+test("§R6 R18 reports every repeated occurrence within a nested collection", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const layer = structuredClone(p.scenes[0].layers[0]);
+  p.scenes[0].layers.push(structuredClone(layer), structuredClone(layer));
+  const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(errors.map(e => e.context.duplicateIndex), [1, 2]);
+  assert.deepEqual(errors.map(e => e.context.firstIndex), [0, 0]);
+});
+
+test("§R7 R18 schema-invalid projects skip nested duplicate checks and validation does not mutate input", () => {
+  const invalid = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  invalid.project.fps = 0;
+  invalid.scenes[0].layers.push(structuredClone(invalid.scenes[0].layers[0]));
+  const snapshot = structuredClone(invalid);
+  const invalidResult = validateProject(invalid);
+  assert.equal(invalidResult.meta.referenceSkipped, true);
+  assert.ok(!codesOf(invalidResult).includes(ISSUE_CODES.REF_DUPLICATE_ENTITY_ID));
+  assert.deepEqual(invalid, snapshot);
+
+  const duplicate = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  duplicate.scenes[0].layers.push(structuredClone(duplicate.scenes[0].layers[0]));
+  const duplicateSnapshot = structuredClone(duplicate);
+  assert.ok(codesOf(validateProject(duplicate)).includes(ISSUE_CODES.REF_DUPLICATE_ENTITY_ID));
+  assert.deepEqual(duplicate, duplicateSnapshot);
+});
+
+test("§R8 R18 valid project passes nested ID checks without mutation", () => {
+  const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
+  const snapshot = structuredClone(p);
+  const result = validateProject(p);
+  assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
+  assert.deepEqual(p, snapshot);
 });
