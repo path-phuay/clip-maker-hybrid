@@ -1421,9 +1421,18 @@ test("§R3 R18 duplicate effect IDs are detected among sibling effects", () => {
 
 test("§R4 R18 duplicate IDs in audio, music, and subtitle tracks are detected independently", () => {
   const p = loadJson(join(VALID_DIR, "cartoon-story.json"));
-  p.timeline.audioTracks.push({ ...structuredClone(p.timeline.audioTracks[0]), id: p.timeline.audioTracks[0].id });
-  p.timeline.musicTracks.push({ ...structuredClone(p.timeline.musicTracks[0]), id: p.timeline.musicTracks[0].id });
-  p.timeline.subtitleTracks.push({ ...structuredClone(p.timeline.subtitleTracks[0]), id: p.timeline.subtitleTracks[0].id });
+  p.timeline.audioTracks = [
+    { id: "audio_duplicate", assetId: "voice_001", start: 0 },
+    { id: "audio_duplicate", assetId: "voice_001", start: 1 }
+  ];
+  p.timeline.musicTracks = [
+    { id: "music_duplicate", assetId: "voice_001", start: 0 },
+    { id: "music_duplicate", assetId: "voice_001", start: 1 }
+  ];
+  p.timeline.subtitleTracks = [
+    { id: "subtitle_duplicate", text: "Hello", start: 0, duration: 1 },
+    { id: "subtitle_duplicate", text: "World", start: 1, duration: 1 }
+  ];
   const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
   assert.equal(errors.length, 3);
   assert.deepEqual(errors.map(e => e.context.collection), [
@@ -1448,7 +1457,7 @@ test("§R6 R18 reports every repeated occurrence within a nested collection", ()
   p.scenes[0].layers.push(structuredClone(layer), structuredClone(layer));
   const errors = validateProject(p).errors.filter(e => e.code === ISSUE_CODES.REF_DUPLICATE_ENTITY_ID);
   assert.equal(errors.length, 2);
-  assert.deepEqual(errors.map(e => e.context.duplicateIndex), [1, 2]);
+  assert.deepEqual(errors.map(e => e.context.duplicateIndex), [4, 5]);
   assert.deepEqual(errors.map(e => e.context.firstIndex), [0, 0]);
 });
 
