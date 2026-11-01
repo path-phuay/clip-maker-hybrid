@@ -242,15 +242,10 @@
     "audioTracks": [
       {
         "id": "audio_001",
-        "assetId": "voice_001",
+        "assetId": "voice_missing",
         "start": 0.2,
         "duration": 2,
         "volume": 0.9
-      },
-      {
-        "id": "music_001",
-        "assetId": "music_missing",
-        "start": 2
       }
     ],
     "subtitleTracks": [
@@ -262,7 +257,13 @@
         "language": "th"
       }
     ],
-    "musicTracks": []
+    "musicTracks": [
+      {
+        "id": "music_001",
+        "assetId": "music_missing",
+        "start": 2
+      }
+    ]
   },
   "legacyData": {
     "sourceVersion": "v1"
