@@ -623,6 +623,57 @@ function checkShotProjectDurationBounds(project, out) {
 }
 
 /**
+ * T5 — Timeline tracks must start and, when duration is present, end
+ * at or before project.duration. Audio/music duration is optional in schema,
+ * so tracks without it are checked only for their start position.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkTimelineTrackProjectDurationBounds(project, out) {
+  const projectDuration = project.project.duration;
+  const collections = [
+    ["audioTracks", project.timeline?.audioTracks ?? []],
+    ["musicTracks", project.timeline?.musicTracks ?? []],
+    ["subtitleTracks", project.timeline?.subtitleTracks ?? []]
+  ];
+
+  for (const [collection, tracks] of collections) {
+    tracks.forEach((track, trackIndex) => {
+      const trackEnd = typeof track.duration === "number"
+        ? track.start + track.duration
+        : undefined;
+      if (track.start <= projectDuration &&
+          (trackEnd === undefined || trackEnd <= projectDuration)) return;
+
+      const startExceeds = track.start > projectDuration;
+      const pathField = startExceeds ? "start" : "duration";
+      const message = startExceeds
+        ? `Timeline track "${track.id}" starts at ${track.start}s, after project duration ${projectDuration}s.`
+        : `Timeline track "${track.id}" ends at ${trackEnd}s, after project duration ${projectDuration}s.`;
+      out.push(makeIssue({
+        severity: "error",
+        code: ISSUE_CODES.TEMP_TIMELINE_TRACK_EXCEEDS_PROJECT_DURATION,
+        message,
+        path: pointer(["timeline", collection, String(trackIndex), pathField]),
+        entityId: track.id,
+        context: {
+          collection,
+          trackId: track.id,
+          trackIndex,
+          trackStart: track.start,
+          ...(trackEnd === undefined ? {} : { trackEnd }),
+          projectDuration,
+          overflow: startExceeds
+            ? track.start - projectDuration
+            : trackEnd - projectDuration
+        }
+      }));
+    });
+  }
+}
+
+/**
  * Run all approved reference and temporal rules against a schema-valid project.
  * Never mutates input.
  *
@@ -646,5 +697,6 @@ export function validateReferences(project) {
   checkGraphicStartBounds(project, out); // T4
   checkGraphicShotBounds(project, out); // T2
   checkShotProjectDurationBounds(project, out); // T3
+  checkTimelineTrackProjectDurationBounds(project, out); // T5
   return { errors: out };
 }
