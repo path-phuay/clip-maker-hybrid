@@ -22,7 +22,7 @@
 //   §Q  DS-09B T1/T2/T3 Temporal Integrity (13)
 //   §R  DS-09C1 Nested Collection Duplicate IDs (8)
 //
-// Total: 109 tests
+// Total: 117 tests
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
