@@ -17,6 +17,7 @@ import {
 } from "./issues.js";
 import { validateComposition } from "./CompositionValidator.js";
 import { EFFECT_ASSET_CONTRACT } from "./effectAssetContract.js";
+import { EFFECT_PARAMETER_CONTRACT } from "./effectParameterContract.js";
 
 /**
  * Build a JSON Pointer path for an Issue. Dynamic tokens are escaped.
@@ -226,6 +227,105 @@ function checkEffectAssetReferences(project, out) {
           registry: contract.registry
         }
       }));
+    });
+  });
+}
+
+
+/**
+ * DS-09E3B — Validate parameters for explicitly contracted Effect Types.
+ * Parameters are optional; supplied parameters must match the contract.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkEffectParameters(project, out) {
+  (project.shots ?? []).forEach((shot, shotIndex) => {
+    (shot.effects ?? []).forEach((effect, effectIndex) => {
+      if (!Object.prototype.hasOwnProperty.call(EFFECT_PARAMETER_CONTRACT, effect.type)) return;
+      if (effect.params === undefined) return;
+
+      const basePath = ["shots", String(shotIndex), "effects", String(effectIndex)];
+      const contextBase = {
+        shotId: shot.id,
+        effectId: effect.id,
+        effectType: effect.type
+      };
+
+      if (
+        effect.params === null ||
+        typeof effect.params !== "object" ||
+        Array.isArray(effect.params)
+      ) {
+        out.push(makeIssue({
+          severity: "error",
+          code: ISSUE_CODES.REF_EFFECT_PARAMS_INVALID,
+          message: `Effect "${effect.id}" params must be an object.`,
+          path: pointer([...basePath, "params"]),
+          entityId: effect.id,
+          context: contextBase
+        }));
+        return;
+      }
+
+      const contract = EFFECT_PARAMETER_CONTRACT[effect.type];
+      for (const [name, value] of Object.entries(effect.params)) {
+        const rule = contract[name];
+        const paramPath = pointer([...basePath, "params", name]);
+        if (!rule) {
+          out.push(makeIssue({
+            severity: "error",
+            code: ISSUE_CODES.REF_EFFECT_PARAM_UNKNOWN,
+            message: `Parameter "${name}" is not defined for Effect Type "${effect.type}".`,
+            path: paramPath,
+            entityId: effect.id,
+            context: { ...contextBase, parameter: name }
+          }));
+          continue;
+        }
+
+        if (typeof value !== rule.type || (rule.type === "number" && !Number.isFinite(value))) {
+          out.push(makeIssue({
+            severity: "error",
+            code: ISSUE_CODES.REF_EFFECT_PARAM_TYPE_INVALID,
+            message: `Parameter "${name}" for Effect Type "${effect.type}" must be a ${rule.type}.`,
+            path: paramPath,
+            entityId: effect.id,
+            context: { ...contextBase, parameter: name, expectedType: rule.type }
+          }));
+          continue;
+        }
+
+        if (rule.type === "number" && (value < rule.min || value > rule.max)) {
+          out.push(makeIssue({
+            severity: "error",
+            code: ISSUE_CODES.REF_EFFECT_PARAM_OUT_OF_RANGE,
+            message: `Parameter "${name}" must be between ${rule.min} and ${rule.max}.`,
+            path: paramPath,
+            entityId: effect.id,
+            context: { ...contextBase, parameter: name, value, min: rule.min, max: rule.max }
+          }));
+          continue;
+        }
+
+        if (
+          (rule.format === "hex-color" && !rule.pattern.test(value)) ||
+          (rule.enum && !rule.enum.includes(value))
+        ) {
+          out.push(makeIssue({
+            severity: "error",
+            code: ISSUE_CODES.REF_EFFECT_PARAM_FORMAT_INVALID,
+            message: `Parameter "${name}" has an invalid format or value for Effect Type "${effect.type}".`,
+            path: paramPath,
+            entityId: effect.id,
+            context: {
+              ...contextBase,
+              parameter: name,
+              ...(rule.enum ? { allowedValues: rule.enum.join(",") } : { expectedFormat: "hex-color" })
+            }
+          }));
+        }
+      }
     });
   });
 }
@@ -831,6 +931,7 @@ export function validateReferences(project) {
   checkTimelineAudioAssetReferences(project, out); // R15 + R16
   checkGraphicAssetReferences(project, out); // R19
   checkEffectAssetReferences(project, out); // R20 DS-09E2
+  checkEffectParameters(project, out); // DS-09E3B
   checkDuplicateEntityIds(project, out); // R18
   checkShotOverlaps(project, out); // T1
   checkGraphicStartBounds(project, out); // T4
