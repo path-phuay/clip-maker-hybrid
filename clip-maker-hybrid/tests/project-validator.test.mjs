@@ -2,7 +2,7 @@
 // DS-02 through DS-09B tests. Run via `node --test tests/`.
 // DS-01 tests in tests/schema.test.mjs are NOT touched.
 //
-// Total: 91 tests
+// Total: 109 tests
 //   §A  Valid paths                            (2)
 //   §B  Schema-invalid + Layer B skip          (1)
 //   §C  Reference rules (R1,R5,R7,R8,R9,R10)      (6)
@@ -1263,14 +1263,12 @@ test("§Q10 T3 rejects a shot ending after project.duration", () => {
   p.shots[1].duration = 4.1;
   const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.TEMP_SHOT_EXCEEDS_PROJECT_DURATION);
   assert.ok(e);
-  assert.deepEqual(
-    { path: e.path, entityId: e.entityId, context: e.context },
-    {
-      path: "/shots/1/duration",
-      entityId: "shot_002",
-      context: { shotId: "shot_002", shotEnd: 12.1, projectDuration: 12, overflow: 0.09999999999999964 }
-    }
-  );
+  assert.equal(e.path, "/shots/1/duration");
+  assert.equal(e.entityId, "shot_002");
+  assert.equal(e.context.shotId, "shot_002");
+  assert.equal(e.context.shotEnd, 12.1);
+  assert.equal(e.context.projectDuration, 12);
+  assert.ok(Math.abs(e.context.overflow - 0.1) < 1e-9);
 });
 
 test("§Q11 T3 allows trailing empty timeline space", () => {
