@@ -6,7 +6,7 @@
 //      documented input contract below)
 //   2. Layer A — schema validation
 //      • If fails → skip Layer B entirely (per Owner Q1=A)
-//   3. Layer B — reference validation (approved rules only: R1,R5,R7,R8,R9,R10,R11,R12,R13)
+//   3. Layer B — reference validation (approved rules only: R1,R5,R7,R8,R9,R10,R11,R12,R13,R14,R15,R16)
 //
 // INPUT CONTRACT (narrowed per Architecture Owner DS-02 Round 2.3 review):
 //
