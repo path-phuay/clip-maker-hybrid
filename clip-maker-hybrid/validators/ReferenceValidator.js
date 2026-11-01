@@ -1,7 +1,7 @@
 // validators/ReferenceValidator.js
 // Layer B: semantic reference validation.
 // Implements ONLY the Architecture-Owner-approved rules:
-//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17.
+//   R1, R5, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18.
 // Does NOT mutate input. Reads only. Returns { errors: Issue[] }.
 //
 // Precondition: caller (ProjectValidator) must only invoke this when
@@ -430,6 +430,49 @@ function checkCameraFocusTargetActorReferences(project, out) {
 }
 
 /**
+ * R18 — IDs must be unique within scenes[] and shots[] independently.
+ * The first occurrence is canonical; each later occurrence emits one issue
+ * at the duplicate entry's id path.
+ *
+ * @param {Object} project
+ * @param {import("./issues.js").Issue[]} out
+ */
+function checkDuplicateEntityIds(project, out) {
+  const collections = [
+    { name: "scenes", entries: project.scenes ?? [] },
+    { name: "shots", entries: project.shots ?? [] },
+  ];
+
+  for (const collection of collections) {
+    const firstIndexById = new Map();
+    collection.entries.forEach((entry, index) => {
+      if (!entry || typeof entry !== "object" || typeof entry.id !== "string") return;
+      if (!firstIndexById.has(entry.id)) {
+        firstIndexById.set(entry.id, index);
+        return;
+      }
+
+      const firstIndex = firstIndexById.get(entry.id);
+      out.push(
+        makeIssue({
+          severity: "error",
+          code: ISSUE_CODES.REF_DUPLICATE_ENTITY_ID,
+          message: `Duplicate id "${entry.id}" in ${collection.name}[]; first declared at index ${firstIndex}.`,
+          path: pointer([collection.name, String(index), "id"]),
+          entityId: entry.id,
+          context: {
+            collection: collection.name,
+            id: entry.id,
+            firstIndex,
+            duplicateIndex: index,
+          },
+        })
+      );
+    });
+  }
+}
+
+/**
  * Run all approved reference rules against a schema-valid project.
  * Never mutates input.
  *
@@ -448,5 +491,6 @@ export function validateReferences(project) {
   checkCameraTargetActorReferences(project, out); // R11
   checkCameraFocusTargetActorReferences(project, out); // R12
   checkTimelineAudioAssetReferences(project, out); // R15 + R16
+  checkDuplicateEntityIds(project, out); // R18
   return { errors: out };
 }
