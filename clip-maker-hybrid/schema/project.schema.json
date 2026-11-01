@@ -230,6 +230,16 @@
           "additionalProperties": {
             "$ref": "#/$defs/rigAsset"
           }
+        },
+        "audio": {
+          "type": "object",
+          "description": "Map of audioAssetId -> audio asset definition used by audio and music tracks.",
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/audioAsset"
+          }
         }
       }
     },
@@ -934,6 +944,23 @@
       }
     },
     "rigAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "uri"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "audioAsset": {
       "type": "object",
       "additionalProperties": false,
       "required": [
