@@ -1502,17 +1502,13 @@ test("§S2 T4 rejects a graphic starting before its containing shot", () => {
   p.shots[1].graphics = [{ id: "graphic_early", type: "text", text: "Early", start: 3.4, duration: 1 }];
   const e = validateProject(p).errors.find(x => x.code === ISSUE_CODES.TEMP_GRAPHIC_BEFORE_SHOT);
   assert.ok(e);
-  assert.deepEqual({ path: e.path, entityId: e.entityId, context: e.context }, {
-    path: "/shots/1/graphics/0/start",
-    entityId: "graphic_early",
-    context: {
-      shotId: "shot_002",
-      graphicId: "graphic_early",
-      shotStart: 3.5,
-      graphicStart: 3.4,
-      offset: 0.1
-    }
-  });
+  assert.equal(e.path, "/shots/1/graphics/0/start");
+  assert.equal(e.entityId, "graphic_early");
+  assert.equal(e.context.shotId, "shot_002");
+  assert.equal(e.context.graphicId, "graphic_early");
+  assert.equal(e.context.shotStart, 3.5);
+  assert.equal(e.context.graphicStart, 3.4);
+  assert.ok(Math.abs(e.context.offset - 0.1) < 1e-9);
 });
 
 test("§S3 T4 reports every graphic starting before its shot", () => {
