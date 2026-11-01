@@ -135,3 +135,26 @@ test("assets.rigs rejects missing uri and unexpected properties", () => {
   extraProperty.assets.rigs.rig_humanoid_basic.kind = "json";
   assert.equal(validate(extraProperty), false);
 });
+
+
+test("assets.audio accepts the dedicated { id, uri } audio asset shape", () => {
+  const ajv = buildAjv();
+  const validate = ajv.compile(loadJson(SCHEMA_PATH));
+  const project = loadJson(join(VALID_DIR, "minimal-project.json"));
+  project.assets.audio = { sound_001: { id: "sound_001", uri: "audio/sound.wav" } };
+  assert.equal(validate(project), true, JSON.stringify(validate.errors, null, 2));
+});
+
+test("assets.audio rejects missing uri and unexpected properties", () => {
+  const ajv = buildAjv();
+  const validate = ajv.compile(loadJson(SCHEMA_PATH));
+  const base = loadJson(join(VALID_DIR, "minimal-project.json"));
+
+  const missingUri = structuredClone(base);
+  missingUri.assets.audio = { sound_001: { id: "sound_001", uri: "" } };
+  assert.equal(validate(missingUri), false);
+
+  const extraProperty = structuredClone(base);
+  extraProperty.assets.audio = { sound_001: { id: "sound_001", uri: "audio/sound.wav", codec: "wav" } };
+  assert.equal(validate(extraProperty), false);
+});
