@@ -102,8 +102,9 @@ function renderValidation(result) {
     setValidationState("Valid", "ClipProject v2 schema and reference validation passed. No issues to inspect.", layerText);
     return;
   }
-  currentIssues = result.errors ?? [];
-  setValidationState("Invalid", `${currentIssues.length} validation error${currentIssues.length === 1 ? "" : "s"} found. Select an issue to inspect its location.`, layerText);
+  const issues = result.errors ?? [];
+  setValidationState("Invalid", `${issues.length} validation error${issues.length === 1 ? "" : "s"} found. Select an issue to inspect its location.`, layerText);
+  currentIssues = issues;
   currentIssues.forEach((issue, index) => {
     const item = document.createElement("li");
     const button = document.createElement("button");
