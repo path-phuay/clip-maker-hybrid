@@ -1,87 +1,10 @@
 import { ProjectManager } from "./core/ProjectManager.js";
-
 const manager = new ProjectManager();
-
-const elements = {
-  file: document.querySelector("#project-file"),
-  save: document.querySelector("#save-project"),
-  status: document.querySelector("#project-status"),
-  message: document.querySelector("#message"),
-  title: document.querySelector("#summary-title"),
-  schema: document.querySelector("#summary-schema"),
-  duration: document.querySelector("#summary-duration"),
-  resolution: document.querySelector("#summary-resolution"),
-  scenes: document.querySelector("#summary-scenes"),
-  shots: document.querySelector("#summary-shots"),
-};
-
-function setMessage(message, kind = "info") {
-  elements.message.textContent = message;
-  elements.message.dataset.kind = kind;
-}
-
-function showSummary(project) {
-  const settings = project.project ?? {};
-  const resolution = settings.resolution ?? {};
-
-  elements.title.textContent = settings.title ?? "Untitled";
-  elements.schema.textContent = project.schemaVersion ?? "Unknown";
-  elements.duration.textContent =
-    Number.isFinite(settings.duration) ? `${settings.duration} s` : "—";
-  elements.resolution.textContent =
-    resolution.width && resolution.height
-      ? `${resolution.width} × ${resolution.height}`
-      : "—";
-  elements.scenes.textContent = Array.isArray(project.scenes)
-    ? String(project.scenes.length)
-    : "—";
-  elements.shots.textContent = Array.isArray(project.shots)
-    ? String(project.shots.length)
-    : "—";
-}
-
-function downloadJson(fileName, content) {
-  const blob = new Blob([content], { type: "application/json;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-elements.file.addEventListener("change", async () => {
-  const [file] = elements.file.files ?? [];
-  if (!file) return;
-
-  try {
-    const project = await manager.loadFile(file);
-    showSummary(project);
-    elements.status.textContent = "Project loaded";
-    elements.status.dataset.state = "success";
-    elements.save.disabled = false;
-    setMessage(
-      `Loaded ${file.name}. JSON parsing succeeded. Full ClipProject validation is not connected in DS-11.`,
-      "success",
-    );
-  } catch (error) {
-    elements.status.textContent = "Load failed";
-    elements.status.dataset.state = "error";
-    elements.save.disabled = true;
-    setMessage(error instanceof Error ? error.message : "Unable to load project.", "error");
-  } finally {
-    elements.file.value = "";
-  }
-});
-
-elements.save.addEventListener("click", () => {
-  try {
-    const baseName = (manager.fileName ?? "clip-project").replace(/\.json$/i, "");
-    downloadJson(`${baseName}.export.json`, manager.exportJson());
-    setMessage("Project JSON export started.", "success");
-  } catch (error) {
-    setMessage(error instanceof Error ? error.message : "Unable to export project.", "error");
-  }
-});
+const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+const el = Object.fromEntries(["project-file","save-project","project-status","message","summary-title","summary-schema","summary-duration","summary-resolution","summary-scenes","summary-shots","import-classification","import-hints","import-warnings"].map(id => [id, document.getElementById(id)]));
+function message(value, kind="info"){el["message"].textContent=value;el["message"].dataset.kind=kind;}
+function summary(p){const s=p.project??{},r=s.resolution??{};el["summary-title"].textContent=s.title??"Untitled";el["summary-schema"].textContent=p.schemaVersion??"Unknown";el["summary-duration"].textContent=Number.isFinite(s.duration)?`${s.duration} s`:"—";el["summary-resolution"].textContent=r.width&&r.height?`${r.width} × ${r.height}`:"—";el["summary-scenes"].textContent=Array.isArray(p.scenes)?String(p.scenes.length):"—";el["summary-shots"].textContent=Array.isArray(p.shots)?String(p.shots.length):"—";}
+function inspection(record){el["import-classification"].textContent=record.inspection.classification;el["import-hints"].textContent=record.inspection.legacyHintKeys.join(", ")||"None detected at top level";el["import-warnings"].replaceChildren();for(const warning of record.warnings){const li=document.createElement("li");li.textContent=warning;el["import-warnings"].append(li);}}
+function download(name,content){const url=URL.createObjectURL(new Blob([content],{type:"application/json;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download=name;document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);}
+el["project-file"].addEventListener("change",async()=>{const [file]=el["project-file"].files??[];if(!file)return;if(file.size>MAX_IMPORT_BYTES){el["project-status"].textContent="Import rejected";el["project-status"].dataset.state="error";message("File exceeds the 10 MiB import limit. No project data was loaded.","error");el["project-file"].value="";return;}try{const p=await manager.loadFile(file);summary(p);inspection(manager.importRecord);el["project-status"].textContent="JSON imported · not validated";el["project-status"].dataset.state="success";el["save-project"].disabled=false;message(`Imported ${file.name}. Original JSON text is preserved. No schema validation, legacy conversion, or rendering was performed.`,"success");}catch(e){el["project-status"].textContent="Load failed";el["project-status"].dataset.state="error";el["save-project"].disabled=true;message(e instanceof Error?e.message:"Unable to load project.","error");}finally{el["project-file"].value="";}});
+el["save-project"].addEventListener("click",()=>{try{const base=(manager.fileName??"clip-project").replace(/\.json$/i,"");download(`${base}.original.json`,manager.exportOriginal());message("Original JSON export started without re-serialization.","success");}catch(e){message(e instanceof Error?e.message:"Unable to export project.","error");}});
