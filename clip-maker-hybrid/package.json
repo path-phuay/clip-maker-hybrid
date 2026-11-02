@@ -5,10 +5,14 @@
   "type": "module",
   "description": "ClipProject v2 JSON Schema for Clip Maker Hybrid Animation Generator (DS-01)",
   "scripts": {
-    "test": "node --test tests/"
+    "test": "node --test tests/",
+    "build:validation": "esbuild src/browser/validation-entry.js --bundle --format=esm --platform=browser --outfile=src/browser/validation.bundle.js"
   },
   "dependencies": {
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }
