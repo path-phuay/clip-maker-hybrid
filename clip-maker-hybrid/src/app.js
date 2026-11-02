@@ -1,4 +1,5 @@
 import { ProjectManager } from "./core/ProjectManager.js";
+import { resolveJsonPointer, formatJsonPointer } from "./core/JsonPointer.js";
 import { createProjectValidationService } from "./browser/validation.bundle.js";
 
 const manager = new ProjectManager();
@@ -8,11 +9,12 @@ const el = Object.fromEntries([
   "summary-title", "summary-schema", "summary-duration", "summary-resolution",
   "summary-scenes", "summary-shots", "import-classification", "import-hints",
   "import-warnings", "validation-status", "validation-summary", "validation-layers",
-  "validation-issues"
+  "validation-issues", "validation-context"
 ].map(id => [id, document.getElementById(id)]));
 
 let validationService = null;
 let validationInitializationError = null;
+let currentIssues = [];
 
 function message(value, kind = "info") {
   el.message.textContent = value;
@@ -38,33 +40,89 @@ function inspection(record) {
     el["import-warnings"].append(item);
   }
 }
+function clearContext(text = "Select an issue to inspect its location and read-only data context.") {
+  el["validation-context"].replaceChildren();
+  const note = document.createElement("p");
+  note.className = "context-empty";
+  note.textContent = text;
+  el["validation-context"].append(note);
+}
+function showIssueContext(index) {
+  const issue = currentIssues[index];
+  if (!issue || !manager.project) return;
+  for (const button of el["validation-issues"].querySelectorAll("button")) {
+    const active = Number(button.dataset.issueIndex) === index;
+    button.setAttribute("aria-pressed", String(active));
+  }
+  const panel = el["validation-context"];
+  panel.replaceChildren();
+  const heading = document.createElement("h4");
+  heading.textContent = issue.code ?? "VALIDATION_ERROR";
+  const messageText = document.createElement("p");
+  messageText.textContent = issue.message ?? "No message provided.";
+  const rawPath = document.createElement("code");
+  rawPath.textContent = issue.path || "(root)";
+  const readable = document.createElement("p");
+  readable.className = "context-path";
+  try {
+    readable.textContent = formatJsonPointer(issue.path || "");
+  } catch {
+    readable.textContent = "Path cannot be interpreted as a valid JSON Pointer.";
+  }
+  panel.append(heading, messageText, rawPath, readable);
+  const resolved = resolveJsonPointer(manager.project, issue.path || "");
+  const label = document.createElement("h5");
+  label.textContent = "Read-only value at this path";
+  panel.append(label);
+  const value = document.createElement("pre");
+  if (resolved.found) {
+    try {
+      value.textContent = JSON.stringify(resolved.value, null, 2);
+    } catch {
+      value.textContent = "The value exists but could not be formatted.";
+    }
+  } else {
+    value.textContent = `No exact value found: ${resolved.reason ?? "path unavailable"}`;
+  }
+  panel.append(value);
+}
 function setValidationState(state, summaryText, layersText = "—") {
   el["validation-status"].textContent = state;
   el["validation-status"].dataset.state = state;
   el["validation-summary"].textContent = summaryText;
   el["validation-layers"].textContent = layersText;
   el["validation-issues"].replaceChildren();
+  currentIssues = [];
+  clearContext();
 }
 function renderValidation(result) {
   const layers = result.meta?.layers ?? [];
   const layerText = layers.length ? layers.join(" → ") : "Input check";
   if (result.valid) {
-    setValidationState("Valid", "ClipProject v2 schema and reference validation passed.", layerText);
+    setValidationState("Valid", "ClipProject v2 schema and reference validation passed. No issues to inspect.", layerText);
     return;
   }
-  const issues = result.errors ?? [];
-  setValidationState("Invalid", `${issues.length} validation error${issues.length === 1 ? "" : "s"} found.`, layerText);
-  for (const issue of issues) {
+  currentIssues = result.errors ?? [];
+  setValidationState("Invalid", `${currentIssues.length} validation error${currentIssues.length === 1 ? "" : "s"} found. Select an issue to inspect its location.`, layerText);
+  currentIssues.forEach((issue, index) => {
     const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "validation-issue-button";
+    button.dataset.issueIndex = String(index);
+    button.setAttribute("aria-pressed", "false");
     const heading = document.createElement("strong");
     heading.textContent = issue.code ?? "VALIDATION_ERROR";
-    const detail = document.createElement("p");
+    const detail = document.createElement("span");
     detail.textContent = issue.message ?? "No message provided.";
     const path = document.createElement("code");
     path.textContent = issue.path || "(root)";
-    item.append(heading, detail, path);
+    button.append(heading, detail, path);
+    button.addEventListener("click", () => showIssueContext(index));
+    item.append(button);
     el["validation-issues"].append(item);
-  }
+  });
+  if (currentIssues.length === 0) clearContext("No error details were returned by the validator.");
 }
 function download(name, content) {
   const url = URL.createObjectURL(new Blob([content], { type: "application/json;charset=utf-8" }));
