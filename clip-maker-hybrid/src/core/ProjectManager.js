@@ -1,59 +1,16 @@
-/**
- * Browser-side project file manager for the DS-11 application shell.
- * This module handles JSON file I/O only; validation and rendering are
- * intentionally supplied by later integration stages.
- */
+import { importProjectText, exportOriginalText } from "../adapters/SafeImport.js";
+/** DS-12E browser project manager; import/export only, no validation or rendering. */
 export class ProjectManager {
-  #project = null;
-  #fileName = null;
-
-  get project() {
+  #project=null; #fileName=null; #importRecord=null;
+  get project(){return this.#project;}
+  get fileName(){return this.#fileName;}
+  get importRecord(){return this.#importRecord;}
+  async loadFile(file){
+    if(!(file instanceof File)) throw new TypeError("A browser File is required.");
+    const record=importProjectText(await file.text(),{fileName:file.name});
+    this.#project=record.document; this.#fileName=file.name; this.#importRecord=record;
     return this.#project;
   }
-
-  get fileName() {
-    return this.#fileName;
-  }
-
-  async loadFile(file) {
-    if (!(file instanceof File)) {
-      throw new TypeError("A browser File is required.");
-    }
-
-    const text = await file.text();
-    let parsed;
-
-    try {
-      parsed = JSON.parse(text);
-    } catch (cause) {
-      const error = new Error("The selected file is not valid JSON.");
-      error.cause = cause;
-      throw error;
-    }
-
-    if (
-      parsed === null ||
-      typeof parsed !== "object" ||
-      Array.isArray(parsed)
-    ) {
-      throw new TypeError("A ClipProject document must be a JSON object.");
-    }
-
-    this.#project = parsed;
-    this.#fileName = file.name;
-    return parsed;
-  }
-
-  exportJson() {
-    if (!this.#project) {
-      throw new Error("No project is loaded.");
-    }
-
-    return JSON.stringify(this.#project, null, 2);
-  }
-
-  clear() {
-    this.#project = null;
-    this.#fileName = null;
-  }
+  exportOriginal(){if(!this.#importRecord)throw new Error("No project is loaded.");return exportOriginalText(this.#importRecord);}
+  clear(){this.#project=null;this.#fileName=null;this.#importRecord=null;}
 }
