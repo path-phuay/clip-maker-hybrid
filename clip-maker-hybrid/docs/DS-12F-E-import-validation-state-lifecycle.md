@@ -1,6 +1,6 @@
 # DS-12F-E — Import & Validation State Lifecycle Hardening
 
-Status: Proposal; no application code changed.
+Status: Implemented; pending local automated and browser verification.
 
 ## 1. Goal
 
@@ -79,7 +79,7 @@ For read or JSON parse failures:
 - `tests`: add focused tests for request ordering/state coordination where testable without a browser, and preserve existing SafeImport/ProjectManager contracts.
 - `docs/DS-12F-E-import-validation-state-lifecycle.md`: record behavior, tests, and limitations.
 
-No schema, validator, validation bundle, or CSS changes are expected unless implementation evidence shows they are required.
+No schema, validator, validation bundle, or CSS changes were made.
 
 ## 6. Verification plan
 
@@ -103,4 +103,17 @@ No schema, validator, validation bundle, or CSS changes are expected unless impl
 
 ## 8. Approval boundary
 
-This document is a proposal only. Do not implement DS-12F-E until the user approves the scope and behavior above.
+The user approved this scope. Implementation is recorded below; acceptance remains pending local verification.
+
+## 9. Implementation record
+
+- Added `src/core/ImportRequestGuard.js` to issue monotonically increasing request tokens.
+- Updated `ProjectManager.loadFile(file, { isCurrent })` so a completed stale read cannot replace the active project/import record.
+- Updated `src/app.js` to clear the prior project, summary, import inspection, validation issues/context, and export availability as soon as a new import attempt begins.
+- Oversized files are rejected after clearing the previous active project and before file reading or validation.
+- Read/parse failures clear active project state and disable export.
+- Only the latest request may update visible state.
+- Validator readiness remains independent: a project loaded during initialization is validated when initialization resolves; validator failure leaves a successfully imported original available for export.
+- Added a ProjectManager race test proving a slower earlier read cannot replace a later file.
+
+Local verification is still required. Do not mark this stage accepted until the full test suite and browser scenarios in section 6 pass.
