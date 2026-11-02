@@ -22,6 +22,23 @@ function message(value, kind = "info") {
   el.message.textContent = value;
   el.message.dataset.kind = kind;
 }
+function clearProjectView() {
+  for (const id of ["summary-title", "summary-schema", "summary-duration", "summary-resolution", "summary-scenes", "summary-shots", "import-classification", "import-hints"]) {
+    el[id].textContent = "—";
+  }
+  el["import-warnings"].replaceChildren();
+  el["save-project"].disabled = true;
+}
+function beginImportAttempt() {
+  const token = importRequests.begin();
+  manager.clear();
+  clearProjectView();
+  el["project-status"].textContent = "Importing";
+  el["project-status"].dataset.state = "pending";
+  setValidationState(validationService ? "Ready" : validationInitializationError ? "Unavailable" : "Initializing", "Waiting for the selected JSON file.");
+  message("Reading selected JSON file…");
+  return token;
+}
 function summary(project) {
   const data = project.project ?? {};
   const resolution = data.resolution ?? {};
@@ -142,6 +159,7 @@ setValidationState("Initializing", "Loading the canonical ClipProject v2 schema�
 createProjectValidationService()
   .then(service => {
     validationService = service;
+    validationInitializationError = null;
     if (manager.project) {
       renderValidation(validationService.validateProject(manager.project));
       message("Validation completed. Original JSON text remains preserved for export.", "success");
@@ -152,20 +170,26 @@ createProjectValidationService()
   .catch(error => {
     validationInitializationError = error;
     setValidationState("Unavailable", error instanceof Error ? error.message : "Validator initialization failed.");
+    if (manager.project) message("Project imported, but validation is unavailable. Original JSON export remains available.", "error");
   });
 
 el["project-file"].addEventListener("change", async () => {
   const [file] = el["project-file"].files ?? [];
   if (!file) return;
+  const token = beginImportAttempt();
+
   if (file.size > MAX_IMPORT_BYTES) {
     el["project-status"].textContent = "Import rejected";
     el["project-status"].dataset.state = "error";
+    setValidationState(validationService ? "Ready" : validationInitializationError ? "Unavailable" : "Initializing", "Validation was not run because the file exceeded the import limit.");
     message("File exceeds the 10 MiB import limit. No project data was loaded.", "error");
     el["project-file"].value = "";
     return;
   }
+
   try {
-    const project = await manager.loadFile(file);
+    const project = await manager.loadFile(file, { isCurrent: () => importRequests.isCurrent(token) });
+    if (!importRequests.isCurrent(token)) return;
     summary(project);
     inspection(manager.importRecord);
     el["project-status"].textContent = "JSON imported";
@@ -174,19 +198,23 @@ el["project-file"].addEventListener("change", async () => {
     if (validationService) {
       renderValidation(validationService.validateProject(project));
       message(`Imported ${file.name}. Original JSON text is preserved. Validation does not convert or render the project.`, "success");
+    } else if (validationInitializationError) {
+      setValidationState("Unavailable", validationInitializationError instanceof Error ? validationInitializationError.message : "Validator initialization failed.");
+      message(`Imported ${file.name}, but validation is unavailable. Original JSON export remains available.`, "error");
     } else {
-      setValidationState("Unavailable", validationInitializationError instanceof Error
-        ? validationInitializationError.message
-        : "The validator is not ready. Original JSON export remains available.");
-      message(`Imported ${file.name}, but validation is unavailable. The original JSON can still be exported.`, "error");
+      setValidationState("Initializing", "Validator is still initializing. This project will be validated when it is ready.");
+      message(`Imported ${file.name}. Original JSON text is preserved; validation is pending.`, "info");
     }
   } catch (error) {
+    if (!importRequests.isCurrent(token)) return;
+    manager.clear();
+    clearProjectView();
     el["project-status"].textContent = "Load failed";
     el["project-status"].dataset.state = "error";
-    el["save-project"].disabled = true;
+    setValidationState(validationService ? "Ready" : validationInitializationError ? "Unavailable" : "Initializing", "Validation was not run because the selected file could not be imported.");
     message(error instanceof Error ? error.message : "Unable to load project.", "error");
   } finally {
-    el["project-file"].value = "";
+    if (importRequests.isCurrent(token)) el["project-file"].value = "";
   }
 });
 
