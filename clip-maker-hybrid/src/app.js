@@ -1,4 +1,5 @@
 import { ProjectManager } from "./core/ProjectManager.js";
+import { getGalleryTemplates } from "./gallery/GalleryCatalog.js";
 import { ImportRequestGuard } from "./core/ImportRequestGuard.js";
 import { resolveJsonPointer, formatJsonPointer } from "./core/JsonPointer.js";
 import { createProjectValidationService } from "./browser/validation.bundle.js";
@@ -11,7 +12,8 @@ const el = Object.fromEntries([
   "summary-title", "summary-schema", "summary-duration", "summary-resolution",
   "summary-scenes", "summary-shots", "import-classification", "import-hints",
   "import-warnings", "validation-status", "validation-summary", "validation-layers",
-  "validation-issues", "validation-context"
+  "validation-issues", "validation-context",
+  "gallery-grid", "gallery-detail", "gallery-message"
 ].map(id => [id, document.getElementById(id)]));
 
 let validationService = null;
@@ -176,47 +178,274 @@ createProjectValidationService()
 el["project-file"].addEventListener("change", async () => {
   const [file] = el["project-file"].files ?? [];
   if (!file) return;
-  const token = beginImportAttempt();
+  await importProjectFile(file);
+});
+
+
+// All project sources use the same guarded import and validation pipeline.
+async function importProjectFile(
+  file,
+  sourceName = file.name,
+  token = beginImportAttempt()
+) {
 
   if (file.size > MAX_IMPORT_BYTES) {
     el["project-status"].textContent = "Import rejected";
     el["project-status"].dataset.state = "error";
-    setValidationState(validationService ? "Ready" : validationInitializationError ? "Unavailable" : "Initializing", "Validation was not run because the file exceeded the import limit.");
+    setValidationState(
+      validationService ? "Ready" : validationInitializationError ? "Unavailable" : "Initializing",
+      "Validation was not run because the file exceeded the import limit."
+    );
     message("File exceeds the 10 MiB import limit. No project data was loaded.", "error");
     el["project-file"].value = "";
-    return;
+    return false;
   }
 
   try {
-    const project = await manager.loadFile(file, { isCurrent: () => importRequests.isCurrent(token) });
-    if (!importRequests.isCurrent(token)) return;
+    const project = await manager.loadFile(file, {
+      isCurrent: () => importRequests.isCurrent(token)
+    });
+
+    if (!importRequests.isCurrent(token)) return false;
+
     summary(project);
     inspection(manager.importRecord);
+
     el["project-status"].textContent = "JSON imported";
     el["project-status"].dataset.state = "success";
     el["save-project"].disabled = false;
+
     if (validationService) {
       renderValidation(validationService.validateProject(project));
-      message(`Imported ${file.name}. Original JSON text is preserved. Validation does not convert or render the project.`, "success");
+      message(
+        `Imported ${sourceName}. Original JSON text is preserved. Validation does not convert or render the project.`,
+        "success"
+      );
     } else if (validationInitializationError) {
-      setValidationState("Unavailable", validationInitializationError instanceof Error ? validationInitializationError.message : "Validator initialization failed.");
-      message(`Imported ${file.name}, but validation is unavailable. Original JSON export remains available.`, "error");
+      setValidationState(
+        "Unavailable",
+        validationInitializationError instanceof Error
+          ? validationInitializationError.message
+          : "Validator initialization failed."
+      );
+      message(
+        `Imported ${sourceName}, but validation is unavailable. Original JSON export remains available.`,
+        "error"
+      );
     } else {
-      setValidationState("Initializing", "Validator is still initializing. This project will be validated when it is ready.");
-      message(`Imported ${file.name}. Original JSON text is preserved; validation is pending.`, "info");
+      setValidationState(
+        "Initializing",
+        "Validator is still initializing. This project will be validated when it is ready."
+      );
+      message(
+        `Imported ${sourceName}. Original JSON text is preserved; validation is pending.`,
+        "info"
+      );
     }
+
+    return true;
   } catch (error) {
-    if (!importRequests.isCurrent(token)) return;
+    if (!importRequests.isCurrent(token)) return false;
+
     manager.clear();
     clearProjectView();
+
     el["project-status"].textContent = "Load failed";
     el["project-status"].dataset.state = "error";
-    setValidationState(validationService ? "Ready" : validationInitializationError ? "Unavailable" : "Initializing", "Validation was not run because the selected file could not be imported.");
-    message(error instanceof Error ? error.message : "Unable to load project.", "error");
+
+    setValidationState(
+      validationService ? "Ready" : validationInitializationError ? "Unavailable" : "Initializing",
+      "Validation was not run because the selected file could not be imported."
+    );
+
+    message(
+      error instanceof Error ? error.message : "Unable to load project.",
+      "error"
+    );
+
+    return false;
   } finally {
-    if (importRequests.isCurrent(token)) el["project-file"].value = "";
+    if (importRequests.isCurrent(token)) {
+      el["project-file"].value = "";
+    }
   }
-});
+}
+
+function createGalleryElement(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+async function showGalleryDetails(template) {
+  const panel = el["gallery-detail"];
+  panel.replaceChildren(
+    createGalleryElement("p", "gallery-detail-loading", "Loading template details...")
+  );
+
+  try {
+    const response = await fetch(template.fixture);
+
+    if (!response.ok) {
+      throw new Error(`Unable to load template details (HTTP ${response.status}).`);
+    }
+
+    const project = JSON.parse(await response.text());
+    const data = project.project ?? {};
+    const resolution = data.resolution ?? {};
+
+    panel.replaceChildren();
+
+    const heading = createGalleryElement("h3", "", template.name);
+    const description = createGalleryElement("p", "", template.description);
+    const details = document.createElement("dl");
+    details.className = "gallery-detail-list";
+
+    const rows = [
+      ["Schema", project.schemaVersion ?? "Unknown"],
+      ["Duration", Number.isFinite(data.duration) ? `${data.duration} s` : "Unknown"],
+      [
+        "Resolution",
+        resolution.width && resolution.height
+          ? `${resolution.width} × ${resolution.height}`
+          : "Unknown"
+      ],
+      ["Scenes", Array.isArray(project.scenes) ? String(project.scenes.length) : "Unknown"],
+      ["Shots", Array.isArray(project.shots) ? String(project.shots.length) : "Unknown"]
+    ];
+
+    for (const [label, value] of rows) {
+      const wrapper = document.createElement("div");
+      const term = createGalleryElement("dt", "", label);
+      const description = createGalleryElement("dd", "", value);
+      wrapper.append(term, description);
+      details.append(wrapper);
+    }
+
+    panel.append(heading, description, details);
+  } catch (error) {
+    panel.replaceChildren(
+      createGalleryElement(
+        "p",
+        "gallery-error",
+        error instanceof Error ? error.message : "Unable to read template details."
+      )
+    );
+  }
+}
+
+async function loadGalleryTemplate(template) {
+  // Begin the guarded request immediately when the user clicks.
+  const token = beginImportAttempt();
+
+  el["gallery-message"].textContent = `Loading ${template.name}...`;
+
+  try {
+    const response = await fetch(template.fixture);
+
+    if (!importRequests.isCurrent(token)) return;
+
+    if (!response.ok) {
+      throw new Error(`Unable to load template (HTTP ${response.status}).`);
+    }
+
+    const sourceText = await response.text();
+
+    if (!importRequests.isCurrent(token)) return;
+
+    const file = new File(
+      [sourceText],
+      `${template.id}.json`,
+      { type: "application/json" }
+    );
+
+    const loaded = await importProjectFile(
+      file,
+      `Gallery template "${template.name}"`,
+      token
+    );
+
+    if (!importRequests.isCurrent(token)) return;
+
+    el["gallery-message"].textContent = loaded
+      ? `${template.name} was loaded into Project workspace. Check its validation status before proceeding.`
+      : `${template.name} could not be imported. Check the Project status for details.`;
+  } catch (error) {
+    if (!importRequests.isCurrent(token)) return;
+
+    manager.clear();
+    clearProjectView();
+
+    el["project-status"].textContent = "Load failed";
+    el["project-status"].dataset.state = "error";
+
+    setValidationState(
+      validationService
+        ? "Ready"
+        : validationInitializationError
+          ? "Unavailable"
+          : "Initializing",
+      "Validation was not run because the Gallery template could not be loaded."
+    );
+
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Unable to load Gallery template.";
+
+    message(errorMessage, "error");
+    el["gallery-message"].textContent = errorMessage;
+  }
+}
+
+function renderGallery() {
+  const grid = el["gallery-grid"];
+  grid.replaceChildren();
+
+  for (const template of getGalleryTemplates()) {
+    const card = createGalleryElement("article", "gallery-card");
+    const category = createGalleryElement(
+      "span",
+      "gallery-category",
+      template.category
+    );
+    const heading = createGalleryElement("h3", "", template.name);
+    const description = createGalleryElement("p", "", template.description);
+    const tags = createGalleryElement("div", "gallery-tags");
+
+    for (const tag of template.tags) {
+      tags.append(createGalleryElement("span", "gallery-tag", tag));
+    }
+
+    const actions = createGalleryElement("div", "gallery-card-actions");
+
+    const detailsButton = createGalleryElement(
+      "button",
+      "button",
+      "View details"
+    );
+    detailsButton.type = "button";
+    detailsButton.addEventListener("click", () => {
+      showGalleryDetails(template);
+    });
+
+    const useButton = createGalleryElement(
+      "button",
+      "button button-primary",
+      "Use template"
+    );
+    useButton.type = "button";
+    useButton.addEventListener("click", () => {
+      loadGalleryTemplate(template);
+    });
+
+    actions.append(detailsButton, useButton);
+    card.append(category, heading, description, tags, actions);
+    grid.append(card);
+  }
+}
+
+renderGallery();
 
 el["save-project"].addEventListener("click", () => {
   try {

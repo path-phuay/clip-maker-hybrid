@@ -13,6 +13,27 @@
     <span class="mode-badge">HYBRID SHELL · DS-12F-D</span>
   </header>
   <main class="workspace">
+    <section class="panel gallery-panel" aria-labelledby="gallery-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">TEMPLATE LIBRARY</p>
+          <h2 id="gallery-heading">GPT-6 Gallery</h2>
+        </div>
+        <span class="status">3 validated samples</span>
+      </div>
+      <p class="gallery-intro">
+        Explore ClipProject v2 samples. Template details are read from their original JSON files.
+      </p>
+      <div id="gallery-grid" class="gallery-grid"></div>
+      <section class="gallery-detail" aria-live="polite" aria-label="Template details">
+        <div id="gallery-detail">
+          <p class="context-empty">Select View details to inspect a template.</p>
+        </div>
+      </section>
+      <p id="gallery-message" class="gallery-message" role="status" aria-live="polite">
+        Choose a template to inspect or load it into the Project workspace.
+      </p>
+    </section>
     <section class="panel project-panel" aria-labelledby="project-heading">
       <div class="panel-heading">
         <div><p class="eyebrow">PROJECT</p><h2 id="project-heading">Project workspace</h2></div>
