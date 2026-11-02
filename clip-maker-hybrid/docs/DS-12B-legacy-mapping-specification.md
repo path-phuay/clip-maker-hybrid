@@ -1,73 +1,77 @@
-# DS-12B — Legacy v1 to ClipProject v2 Mapping Specification
+# DS-12B — Legacy v1 Mapping Specification (Source-Verified Update)
 
-Status: Draft specification. No executable conversion is approved by this document.
+Status: **Source inspection complete; conversion implementation not yet approved.**
 
-## 1. Purpose
+This update supersedes the earlier “blocked on source” status. The executable Legacy Renderer was recovered from Personal Library and audited. Source-backed semantics are recorded in `DS-12B-source-audit.md`.
 
-Turn the initial mapping table in the Hybrid Architecture Plan §8.2 into a reviewable mapping inventory for a future converter.
+## Evidence levels
 
-ClipProject v2 remains the canonical project format. DS-12A remains a read-only compatibility inventory. This document does not implement conversion, invoke a renderer, or claim parity with the original application.
+- **Source-verified**: field or behavior is directly read or implemented in the recovered executable source.
+- **Partially source-verified**: field exists, but all variants, precedence, or cross-feature semantics are not fully inventoried.
+- **Preserve-only**: retain source data without conversion.
+- **Unsupported / blocking**: no safe v2 destination or complete rule is currently approved.
 
-## 2. Evidence levels
+## Mapping inventory
 
-Each mapping has one of these statuses:
-
-- **Concept documented** — the architecture names the v1 concept and a v2 destination, but exact source shape and conversion rules are not verified.
-- **Target shape documented** — the v2 architecture/schema describes a target concept, but the v1-to-v2 transform is not verified.
-- **Blocked on legacy source** — field shape, defaults, units, ordering, or runtime meaning must be read from the complete executable v1 source.
-- **Preserve-only** — retain the original value without interpreting it until a mapping is verified.
-
-No row in the initial mapping table is considered implementation-ready solely because it appears in that table.
-
-## 3. Mapping inventory
-
-| v1 concept / fields | Documented v2 destination | Evidence status | Required verification before conversion |
+| Legacy v1 field | Source evidence | v2 target concept | Status / decision |
 |---|---|---|---|
-| `scenes[]` | `scenes[]` plus `shots[]` | Concept documented; blocked on legacy source | Scene/shot split rules, scene ordering, shot count, timing ownership, and treatment of scene-level fields |
-| `theme` | Scene preset / environment | Concept documented; blocked on legacy source | Accepted theme values, aliases, fallback behavior, and custom-theme representation |
-| `sky`, `ground`, `decor` | Scene environment and layers | Concept documented; target shape documented | Exact value types, drawing order, depth, asset-vs-inline data, and unknown-field handling |
-| `shapes` | Scene objects or graphics | Concept documented; blocked on legacy source | Shape variants, coordinate system, style fields, timing, z-order, and whether each shape belongs to scene or shot |
-| `actors[]` | Shot actor instances | Concept documented; target shape documented | Actor lifetime, scene-to-shot duplication rules, identity, ordering, and per-shot overrides |
-| `c`, `emoji`, `parts`, `svg` | Character definition / asset references | Concept documented; blocked on legacy source | Precedence when multiple forms coexist, accepted types, embedded SVG safety, and asset identity |
-| `act` | Animation action | Concept documented; blocked on legacy source | Supported action names, aliases, parameters, and time evaluation |
-| `x`, `y`, `to`, `dir` | Actor transform and motion | Concept documented; target shape documented | Units, origin, normalized-vs-pixel coordinates, direction encoding, interpolation, and duration |
-| `cam.from`, `cam.to` | Camera transform keyframes | Concept documented; target shape documented | Coordinate space, zoom convention, defaults, interpolation, and transform order |
-| `cam.follow` | Camera target/follow behavior | Concept documented; blocked on legacy source | Target resolution, follow offset, smoothing, activation rules, and missing-target behavior |
-| `cam.shake`, `cam.roll`, `cam.dof` | Camera effects | Concept documented; blocked on legacy source | Parameter shapes, units, evaluation timing, ordering, and whether DOF is visual blur or another effect |
-| `tx`, `hl`, `ts` | Subtitle track | Concept documented; blocked on legacy source | Text model, highlight semantics, timing, layout, style, and track ordering |
-| `gx`, `lt`, `am` | Graphics, lighting, and atmosphere tracks | Concept documented; blocked on legacy source | Exact field schemas, supported variants, time ranges, ordering, and destination ownership |
-| `s`, `d`, `tr` | Shot start, duration, and transition | Concept documented; blocked on legacy source | Units, inclusive/exclusive boundaries, defaults, transition semantics, and total-duration rules |
+| root array / `scenes[]` | `build()` line 253 | `scenes[]` + `shots[]` | Source shape verified; scene/shot split policy still required |
+| `cast` | actor merge in `actors()` around line 476 | reusable characters | Partially verified; preserve-only pending identity/view rules |
+| `assets` (inline SVG strings) | `build()` line 253; `svgActor()` | vector assets / character views | Source verified; sanitize and asset-ID policy required |
+| `style` | `build()` line 253 | project style | Runtime input verified; enum mapping not approved |
+| `w` | `build()` line 253 | shot allocation | Relative weight under global duration override; not a duration |
+| `d` | `build()` line 253 | shot duration | Source value used as seconds; shot split policy required |
+| `s` | cumulative start generated in `build()` | shot start | Preserve-only; do not trust as source start |
+| `theme`, `sky`, `ground`, `decor`, `hz`, `seed` | theme/custom functions | scene environment/layers | Partially verified; alias/fallback and layer mapping require fixtures |
+| `shapes[]` | `drawShapes` / `drawShape` | scene objects / graphics | Partially verified; coordinate variants and z-order need per-kind mapping |
+| `actors[]` | `actors()` | shot actors / character instances | Source verified; cross-scene identity/lifetime not fully established |
+| actor `who`, `c`, `emoji`, `parts`, `svg`, `view`, `act`, `x`, `y`, `to`, `dir`, `s`, `col`, `keys` | actor resolution, motion and render functions | characters, views, transforms, animation | Partially verified; generic fallback must not count as successful mapping |
+| `props[]`, `hold` | `props`, `inferHold`, `held` | props / attachments | Concepts verified; attach offsets/order need tests |
+| `cam.from`, `cam.to`, `follow`, `shake`, `roll`, `dof` | `frame()` line 729 | camera / effects | Source verified; semantics in source audit |
+| `tr` | `frame()` line 729 | transition | `cut`, `fade`, `flash`, `wipe`, `zoom` observed; timing boundaries need tests |
+| `lt`, `am`, `cine` | `lights`, `atmos`, `cinema`, `frame()` | lighting / atmosphere / effects | Partially verified; v2 destination/parameter mapping not approved |
+| `gx` | `gfx()` | motion graphics | `card` and `title` paths observed; full schema and timeline mapping need fixtures |
+| `text`, `tx`, `highlight`, `hl`, `ts` | `build`, `subtitle`, `loop` | subtitle track | Partially verified; speech/layout behavior needs regression tests |
+| `crowd`, `geo` | `crowdOf`, `geoLayers` | scene/shot features | Preserve-only pending explicit v2 contract |
 
-## 4. Conversion invariants
+## Conversion invariants
 
-A future converter must satisfy all of the following:
+1. Do not mutate input.
+2. Preserve complete raw v1 JSON in the migration envelope.
+3. Do not infer one legacy scene equals one v2 scene or one shot.
+4. Treat `w` as relative weight when a global duration is selected.
+5. Do not copy computed `s` as a canonical source start.
+6. Do not invent IDs, assets, actors, coordinate transforms, timing defaults or camera fallbacks.
+7. Emit structured warnings for unsupported, ambiguous or lossy fields.
+8. Keep conversion separate from rendering and validation.
+9. Keep renderer invocation disabled for v2 until conversion tests and parity checks pass.
+10. Preserve original renderer file byte-for-byte.
 
-1. **Pure conversion:** conversion must not mutate the supplied source object.
-2. **Source preservation:** retain a complete, unchanged copy of the original input in the agreed migration envelope. Do not rely on a partial hand-picked subset as the only recovery path.
-3. **No silent loss:** every source field must be classified as mapped, preserved-only, unsupported, or intentionally omitted under an explicitly approved rule.
-4. **No invented defaults:** only use defaults verified from the legacy source or explicitly approved in a versioned mapping rule.
-5. **Stable identity:** generated IDs must be deterministic for the same source and conversion version.
-6. **Deterministic ordering:** preserve source order unless a verified rule requires a different order; document that rule.
-7. **Explicit warnings:** lossy, ambiguous, unsupported, or fallback mappings must produce structured warnings with source paths.
-8. **No renderer side effects:** conversion must not call the Legacy Renderer or the future Hybrid Renderer.
-9. **Versioned mapping:** include a converter/mapping version in conversion metadata so results can be reproduced.
-10. **Fail closed for unsafe ambiguity:** if a required field cannot be interpreted safely, report a blocking conversion issue instead of guessing.
+## Exit criteria
 
-## 5. Proposed conversion report contract
+The source audit is complete. DS-12B conversion remains incomplete until:
+- a full raw-v1 fixture set exists;
+- scene/shot splitting and mapping ownership are approved;
+- unsupported fields have explicit preserve/block decisions;
+- converter passes deterministic, no-mutation, preservation and validator tests;
+- legacy rendering smoke tests and golden-frame comparisons pass.
 
-The following is a conceptual shape, not an implemented API:
+## Conversion Report Contract
+
+The following is the required conceptual result shape for a future
+legacy conversion operation. It is not an implemented API.
 
 ```json
 {
   "conversionAvailable": false,
-  "mappingVersion": "DS-12B-draft",
+  "mappingVersion": "DS-12B",
   "convertedProject": null,
   "issues": [
     {
       "severity": "blocking",
-      "code": "LEGACY_SOURCE_NOT_VERIFIED",
-      "path": "scenes[0].actors[0].x",
-      "message": "Coordinate semantics have not been verified against the legacy renderer."
+      "code": "LEGACY_MAPPING_UNRESOLVED",
+      "path": "scenes[0]",
+      "message": "A required mapping rule has not been approved."
     }
   ],
   "preservation": {
@@ -76,61 +80,5 @@ The following is a conceptual shape, not an implemented API:
 }
 ```
 
-Do not expose `conversionAvailable: true` until the source-dependent rules and real-fixture tests have passed.
-
-## 6. Required legacy-source inspection
-
-Before implementation, inspect the complete original v1 HTML/JavaScript and record evidence for:
-
-- input JSON examples and every field read by the renderer;
-- scene and shot iteration order;
-- `frame(time)` call path and time units;
-- camera transform formulas and transform order;
-- actor coordinate origin, scale, direction, and motion formulas;
-- background/theme aliases and fallback behavior;
-- shape, prop, lighting, atmosphere, cinema-effect, graphic, and subtitle draw order;
-- transition behavior and boundary conditions;
-- Preview, Play, Stop, TTS, and MediaRecorder lifecycle;
-- error handling and any silent fallbacks.
-
-Record source function names and relevant code locations in the implementation report. Do not infer behavior from the architecture plan alone.
-
-## 7. Test plan after source verification
-
-The converter implementation must include:
-
-1. A real v1 fixture for each supported feature family.
-2. A minimal valid v1 project fixture based on the actual renderer input.
-3. A fixture containing unknown fields to verify preservation.
-4. Tests for deterministic IDs and stable ordering.
-5. Tests proving the source object is unchanged.
-6. Tests for missing, malformed, and ambiguous fields.
-7. Tests proving every unsupported field is reported and retained.
-8. Tests validating the converted ClipProject v2 with the existing validators.
-9. A legacy-source integrity check proving the original renderer file is unchanged.
-10. Golden-frame comparisons and playback/recording smoke tests before routing converted projects to a renderer.
-
-## 8. Current blockers and scope boundary
-
-The repository state inspected for DS-12A contains the DS-11 application shell and hybrid modules, but no complete Legacy Renderer source file. The Architecture Plan describes the original baseline at a high level; it is not a substitute for executable source.
-
-The existing `fixtures/valid/legacy-imported.json` is a ClipProject v2 fixture with `legacyData`. It is not, by itself, a verified raw v1 input fixture and must not be treated as proof of the legacy input contract.
-
-Therefore:
-
-- DS-12B mapping inventory is documented at the concept level.
-- Executable v1-to-v2 conversion remains blocked.
-- Legacy renderer invocation remains disabled.
-- No legacy rendering behavior has been changed or tested by DS-12B.
-
-## 9. Exit criteria for DS-12B
-
-DS-12B can be marked implementation-ready only when:
-
-- the complete legacy source is available and inspected;
-- every mapping row has source evidence and an explicit conversion rule or preserve-only disposition;
-- coordinate, timing, ordering, and camera semantics are documented;
-- the owner approves unresolved lossy-conversion decisions;
-- real v1 fixtures and the test plan are ready.
-
-Until then, retain the DS-12A runtime contract unchanged.
+Do not expose `conversionAvailable: true` until all required mapping rules,
+real-fixture tests, deterministic conversion tests, and validation checks pass.
