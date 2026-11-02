@@ -19,7 +19,7 @@ test("browser service validates a valid fixture through both layers", async () =
 
 test("schema errors are reported and reference validation is skipped", async () => {
   const service = await createProjectValidationService({ fetchImpl: fetchSchema });
-  const result = service.validateProject(fixture("invalid/missing-required-field.json"));
+  const result = service.validateProject(fixture("invalid/missing-schema-version.json"));
   assert.equal(result.valid, false);
   assert.deepEqual(result.meta.layers, ["schema"]);
   assert.equal(result.meta.referenceSkipped, true);
