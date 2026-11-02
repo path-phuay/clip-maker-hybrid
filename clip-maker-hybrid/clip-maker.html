@@ -1,72 +1,10 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <title>Clip Maker Hybrid</title>
-  <link rel="stylesheet" href="./styles/app.css">
-</head>
-<body>
-  <header class="app-header">
-    <div>
-      <p class="eyebrow">CLIP MAKER</p>
-      <h1>Hybrid Studio</h1>
-    </div>
-    <span class="mode-badge">HYBRID SHELL · DS-11</span>
-  </header>
-
-  <main class="workspace">
-    <section class="panel project-panel" aria-labelledby="project-heading">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">PROJECT</p>
-          <h2 id="project-heading">Project workspace</h2>
-        </div>
-        <span id="project-status" class="status" role="status">No project loaded</span>
-      </div>
-
-      <div class="project-actions">
-        <label class="button button-primary" for="project-file">Open ClipProject</label>
-        <input id="project-file" class="visually-hidden" type="file" accept=".json,application/json">
-        <button id="save-project" class="button" type="button" disabled>Export JSON</button>
-      </div>
-
-      <div id="message" class="message" role="status" aria-live="polite">
-        Open a ClipProject v2 JSON file to begin. The original Legacy Renderer is not modified or loaded by this shell.
-      </div>
-
-      <dl class="project-summary">
-        <div><dt>Title</dt><dd id="summary-title">—</dd></div>
-        <div><dt>Schema</dt><dd id="summary-schema">—</dd></div>
-        <div><dt>Duration</dt><dd id="summary-duration">—</dd></div>
-        <div><dt>Resolution</dt><dd id="summary-resolution">—</dd></div>
-        <div><dt>Scenes</dt><dd id="summary-scenes">—</dd></div>
-        <div><dt>Shots</dt><dd id="summary-shots">—</dd></div>
-      </dl>
-    </section>
-
-    <section class="panel preview-panel" aria-labelledby="preview-heading">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">RENDER OUTPUT</p>
-          <h2 id="preview-heading">Preview</h2>
-        </div>
-        <span class="status status-muted">Not connected</span>
-      </div>
-      <div class="preview-placeholder">
-        <div class="preview-mark" aria-hidden="true">CM</div>
-        <p>Renderer integration is scheduled for a later stage.</p>
-        <small>DS-11 provides the application shell and project file workflow only.</small>
-      </div>
-    </section>
-  </main>
-
-  <footer class="app-footer">
-    <span>Clip Maker Hybrid</span>
-    <span>Project Manager · DS-11</span>
-  </footer>
-
-  <script type="module" src="./src/app.js"></script>
-</body>
-</html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>Clip Maker Hybrid</title><link rel="stylesheet" href="./styles/app.css"></head>
+<body><header class="app-header"><div><p class="eyebrow">CLIP MAKER</p><h1>Hybrid Studio</h1></div><span class="mode-badge">HYBRID SHELL · DS-12E</span></header>
+<main class="workspace"><section class="panel project-panel" aria-labelledby="project-heading"><div class="panel-heading"><div><p class="eyebrow">PROJECT</p><h2 id="project-heading">Project workspace</h2></div><span id="project-status" class="status" role="status">No project loaded</span></div>
+<div class="project-actions"><label class="button button-primary" for="project-file">Open project JSON</label><input id="project-file" class="visually-hidden" type="file" accept=".json,application/json"><button id="save-project" class="button" type="button" disabled>Export original JSON</button></div>
+<div id="message" class="message" role="status" aria-live="polite">Open a JSON file. The original source text will be preserved; no conversion or rendering occurs.</div>
+<dl class="project-summary"><div><dt>Title</dt><dd id="summary-title">—</dd></div><div><dt>Schema</dt><dd id="summary-schema">—</dd></div><div><dt>Duration</dt><dd id="summary-duration">—</dd></div><div><dt>Resolution</dt><dd id="summary-resolution">—</dd></div><div><dt>Scenes</dt><dd id="summary-scenes">—</dd></div><div><dt>Shots</dt><dd id="summary-shots">—</dd></div></dl>
+<section class="import-inspection" aria-labelledby="import-heading"><p class="eyebrow">SAFE IMPORT · DS-12D</p><h3 id="import-heading">Import inspection</h3><dl class="inspection-list"><div><dt>Classification</dt><dd id="import-classification">—</dd></div><div><dt>Legacy-like top-level keys</dt><dd id="import-hints">—</dd></div></dl><p class="inspection-caption">Key-name hints are informational only and do not verify a legacy format.</p><ul id="import-warnings" class="import-warnings"><li>No import performed.</li></ul></section></section>
+<section class="panel preview-panel" aria-labelledby="preview-heading"><div class="panel-heading"><div><p class="eyebrow">RENDER OUTPUT</p><h2 id="preview-heading">Preview</h2></div><span class="status status-muted">Not connected</span></div><div class="preview-placeholder"><div class="preview-mark" aria-hidden="true">CM</div><p>Renderer integration is not available.</p><small>Import and original-text export only. No legacy conversion or video rendering is performed.</small></div></section></main>
+<footer class="app-footer"><span>Clip Maker Hybrid</span><span>Safe Import · DS-12E</span></footer><script type="module" src="./src/app.js"></script></body></html>
