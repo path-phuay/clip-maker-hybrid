@@ -23,3 +23,24 @@ test("unknown tokens are never current", () => {
   assert.equal(guard.isCurrent(0), false);
   assert.equal(guard.isCurrent(99), false);
 });
+
+import { ProjectManager } from "../src/core/ProjectManager.js";
+
+test("stale asynchronous file reads cannot replace the latest project", async () => {
+  const guard = new ImportRequestGuard();
+  const manager = new ProjectManager();
+  let finishOld;
+  const oldFile = new File(["{}"], "old.json");
+  oldFile.text = () => new Promise(resolve => { finishOld = resolve; });
+  const oldToken = guard.begin();
+  const oldLoad = manager.loadFile(oldFile, { isCurrent: () => guard.isCurrent(oldToken) });
+
+  const newToken = guard.begin();
+  const newFile = new File(['{"project":{"title":"new"}}'], "new.json");
+  await manager.loadFile(newFile, { isCurrent: () => guard.isCurrent(newToken) });
+  finishOld("{}");
+  await oldLoad;
+
+  assert.equal(manager.fileName, "new.json");
+  assert.equal(manager.project.project.title, "new");
+});
