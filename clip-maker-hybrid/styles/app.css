@@ -53,3 +53,20 @@ h2 { margin-bottom: 0; font-size: 1.2rem; letter-spacing: -0.02em; }
 }
 
 .import-inspection{margin-top:22px;border-top:1px solid #30415f;padding-top:20px}.import-inspection h3{margin:0 0 14px;font-size:1rem}.inspection-list{display:grid;gap:10px;margin:0}.inspection-list div{min-width:0;border:1px solid #293a56;border-radius:10px;padding:11px 12px;background:rgba(8,15,29,.3)}.inspection-list dt{margin-bottom:6px;color:#8ea6cf;font-size:.7rem}.inspection-list dd{overflow-wrap:anywhere;margin:0;color:#e8efff;font-size:.82rem;font-weight:600}.inspection-caption{margin:12px 0;color:#a5b4cc;font-size:.76rem;line-height:1.5}.import-warnings{margin:0;padding-left:20px;color:#c3cee0;font-size:.76rem;line-height:1.6}
+
+.validation-panel{margin-top:22px;border-top:1px solid #30415f;padding-top:20px}
+.validation-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.validation-heading h3{margin:0;font-size:1rem}
+.validation-status{white-space:nowrap}
+#validation-status[data-state="Valid"]{color:#9de4bd;border-color:#28634b}
+#validation-status[data-state="Invalid"],#validation-status[data-state="Unavailable"]{color:#ffc1bc;border-color:#793e43}
+#validation-status[data-state="Ready"]{color:#b8c9e8}
+.validation-summary{margin:14px 0 8px;color:#dce6f8;font-size:.86rem;line-height:1.5;overflow-wrap:anywhere}
+.validation-layer{margin:0 0 12px;color:#a5b4cc;font-size:.75rem;overflow-wrap:anywhere}
+.validation-issues{display:grid;gap:10px;margin:0;padding-left:22px}
+.validation-issues li{border:1px solid #67434a;border-radius:10px;padding:11px 12px;background:rgba(55,19,28,.22);overflow-wrap:anywhere}
+.validation-issues strong{color:#ffb9b4;font-size:.76rem}
+.validation-issues p{margin:6px 0;color:#e5dce0;font-size:.8rem;line-height:1.5}
+.validation-issues code{display:block;color:#aebbd0;font-size:.72rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.validation-note{margin:14px 0 0;color:#8ea0bd;font-size:.74rem;line-height:1.55}
+@media(max-width:480px){.validation-heading{flex-direction:column}}
