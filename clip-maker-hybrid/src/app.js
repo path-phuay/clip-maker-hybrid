@@ -1,5 +1,5 @@
 import { ProjectManager } from "./core/ProjectManager.js";
-import { createProjectValidationService } from "./browser/validation-entry.js";
+import { createProjectValidationService } from "./browser/validation.bundle.js";
 
 const manager = new ProjectManager();
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
@@ -81,7 +81,12 @@ setValidationState("Initializing", "Loading the canonical ClipProject v2 schemaâ
 createProjectValidationService()
   .then(service => {
     validationService = service;
-    if (!manager.project) setValidationState("Ready", "Validator initialized. Open a JSON file to validate it.");
+    if (manager.project) {
+      renderValidation(validationService.validateProject(manager.project));
+      message("Validation completed. Original JSON text remains preserved for export.", "success");
+    } else {
+      setValidationState("Ready", "Validator initialized. Open a JSON file to validate it.");
+    }
   })
   .catch(error => {
     validationInitializationError = error;
