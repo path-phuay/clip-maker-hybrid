@@ -1,8 +1,10 @@
 import { ProjectManager } from "./core/ProjectManager.js";
+import { ImportRequestGuard } from "./core/ImportRequestGuard.js";
 import { resolveJsonPointer, formatJsonPointer } from "./core/JsonPointer.js";
 import { createProjectValidationService } from "./browser/validation.bundle.js";
 
 const manager = new ProjectManager();
+const importRequests = new ImportRequestGuard();
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 const el = Object.fromEntries([
   "project-file", "save-project", "project-status", "message",
